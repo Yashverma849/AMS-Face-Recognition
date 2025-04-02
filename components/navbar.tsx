@@ -1,18 +1,62 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, LogOut } from "lucide-react"
+import { Menu, X, LogOut, User } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config"
+import { useAuth } from "@/lib/auth"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const isLoggedIn = pathname !== "/" && pathname !== "/login" && pathname !== "/signup"
+  const { user } = useAuth()
+  const isLoggedIn = !!user || (pathname !== "/" && pathname !== "/login" && pathname !== "/signup")
+  
+  // For user name display
+  const [displayName, setDisplayName] = useState<string>("")
+  const [initials, setInitials] = useState<string>("")
+  
+  // Set display name when user changes
+  useEffect(() => {
+    if (user) {
+      // Try to get name from user metadata
+      const userName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+      
+      // Fallback to email if no name exists
+      const fallbackName = user.email ? user.email.split('@')[0] : "";
+      
+      // Set the display name
+      const nameToDisplay = userName || fallbackName;
+      setDisplayName(nameToDisplay);
+      
+      // Set initials for avatar
+      if (userName) {
+        // If we have a full name, use first letters of first and last name
+        const nameParts = userName.split(' ');
+        if (nameParts.length > 1) {
+          setInitials(`${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase());
+        } else {
+          setInitials(nameParts[0].substring(0, 2).toUpperCase());
+        }
+      } else if (fallbackName) {
+        // Use first 2 chars of email username
+        setInitials(fallbackName.substring(0, 2).toUpperCase());
+      } else {
+        // Default fallback
+        setInitials("U");
+      }
+      
+      console.log("🔍 [NAVBAR] User logged in:", nameToDisplay);
+    } else {
+      setDisplayName("");
+      setInitials("");
+    }
+  }, [user]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -24,6 +68,8 @@ export default function Navbar() {
         supabaseUrl: SUPABASE_URL,
         supabaseKey: SUPABASE_ANON_KEY,
       })
+      
+      console.log("🔍 [NAVBAR] Logging out user:", displayName);
       
       // Sign out from Supabase
       await supabase.auth.signOut()
@@ -37,7 +83,7 @@ export default function Navbar() {
         router.replace('/')
       }, 100)
     } catch (error) {
-      console.error('Error logging out:', error)
+      console.error('❌ [NAVBAR] Error logging out:', error)
       // Try to redirect to homepage even if there's an error
       router.replace('/')
     }
@@ -79,7 +125,19 @@ export default function Navbar() {
               >
                 View Attendance
               </Link>
-              <Button variant="outline" className="ml-4" onClick={handleLogout}>
+              
+              {displayName && (
+                <div className="flex items-center ml-4 mr-2">
+                  <Avatar className="h-8 w-8 bg-emerald-100 text-emerald-800">
+                    <AvatarFallback>{initials}</AvatarFallback>
+                  </Avatar>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    {displayName}
+                  </span>
+                </div>
+              )}
+              
+              <Button variant="outline" className="ml-2" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
@@ -108,6 +166,17 @@ export default function Navbar() {
           <div className="container mx-auto px-4 flex flex-col space-y-4">
             {isLoggedIn ? (
               <>
+                {displayName && (
+                  <div className="flex items-center py-2 border-b border-gray-100 mb-2">
+                    <Avatar className="h-8 w-8 bg-emerald-100 text-emerald-800">
+                      <AvatarFallback>{initials}</AvatarFallback>
+                    </Avatar>
+                    <span className="ml-2 text-sm font-medium text-gray-700">
+                      {displayName}
+                    </span>
+                  </div>
+                )}
+                
                 <Link
                   href="/dashboard"
                   className={`text-sm font-medium ${pathname === "/dashboard" ? "text-emerald-700" : "text-gray-600"}`}
