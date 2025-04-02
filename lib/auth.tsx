@@ -32,12 +32,36 @@ export function useAuth() {
   return context
 }
 
+// Parse auth cookies helper
+type AuthCookies = {
+  auth_success?: string;
+  auth_provider?: string;
+  auth_time?: string;
+  [key: string]: string | undefined;
+};
+
+function getAuthCookies(): AuthCookies | null {
+  if (typeof document === 'undefined') return null;
+  
+  const cookies = document.cookie
+    .split(';')
+    .map(cookie => cookie.trim().split('='))
+    .filter(([name]) => name.startsWith('auth_'))
+    .reduce<AuthCookies>((acc, [name, value]) => ({ 
+      ...acc, 
+      [name]: decodeURIComponent(value) 
+    }), {});
+    
+  return Object.keys(cookies).length > 0 ? cookies : null;
+}
+
 // Auth provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [authChangeCount, setAuthChangeCount] = useState(0) // For debugging
+  const [authCookies, setAuthCookies] = useState<AuthCookies | null>(null)
   const router = useRouter()
   
   // Debug environment variables
@@ -58,6 +82,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (DEBUG_AUTH) {
     console.log("🔍 [AUTH CTX] Supabase client initialized:", !!supabase);
   }
+
+  // Check for auth cookies on mount
+  useEffect(() => {
+    const cookies = getAuthCookies();
+    if (cookies) {
+      setAuthCookies(cookies);
+      console.log("🔍 [AUTH CTX] Found auth cookies:", cookies);
+      
+      if (cookies.auth_success === 'true' && cookies.auth_provider === 'google') {
+        console.log("✅ [AUTH CTX] Google auth cookie detected, refreshing session");
+        
+        // Don't trigger an immediate redirect if we detect auth cookies
+        // Instead, let's ensure we refresh the session
+        const refreshSession = async () => {
+          try {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+              console.error("❌ [AUTH CTX] Error refreshing session after Google auth:", error);
+            } else if (data?.session) {
+              console.log("✅ [AUTH CTX] Successfully refreshed session after Google auth");
+              setSession(data.session);
+              setUser(data.session.user);
+              
+              // Clear the auth cookies since we successfully got the session
+              document.cookie = 'auth_success=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+              document.cookie = 'auth_provider=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+              document.cookie = 'auth_time=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+              
+              // Force router refresh to ensure middleware picks up the new session
+              setTimeout(() => {
+                router.refresh();
+                
+                // If we're not on the dashboard, go there
+                if (window.location.pathname !== '/dashboard') {
+                  console.log("🔍 [AUTH CTX] Redirecting to dashboard after session refresh");
+                  router.replace('/dashboard');
+                }
+              }, 100);
+            }
+          } catch (err) {
+            console.error("❌ [AUTH CTX] Unexpected error refreshing session:", err);
+          }
+        };
+        
+        refreshSession();
+      }
+    }
+  }, [router, supabase]);
 
   useEffect(() => {
     // Get initial session
@@ -257,8 +329,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Force clear session data
       window.localStorage.removeItem('supabase.auth.token');
       
+      // Clear any auth cookies
+      document.cookie = 'auth_success=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'auth_provider=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'auth_time=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      
       if (DEBUG_AUTH) {
-        console.log("🔍 [AUTH CTX] Cleared local storage token");
+        console.log("🔍 [AUTH CTX] Cleared local storage token and cookies");
       }
       
       // Add a delay before redirecting
@@ -303,10 +380,15 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
       // Skip during server-side rendering
       if (typeof window === 'undefined') return;
       
+      // Check for auth cookies in case session isn't ready yet
+      const cookies = getAuthCookies();
+      const hasGoogleAuthCookie = cookies && cookies.auth_success === 'true' && cookies.auth_provider === 'google';
+      
       if (DEBUG_AUTH) {
         console.log('🔍 [AUTH HOC] withAuth authentication check');
         console.log('🔍 [AUTH HOC] Loading:', loading);
         console.log('🔍 [AUTH HOC] User present:', !!user);
+        console.log('🔍 [AUTH HOC] Has Google auth cookie:', hasGoogleAuthCookie);
         if (user) {
           console.log('🔍 [AUTH HOC] User email:', user.email);
         }
@@ -315,8 +397,8 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
       // If authentication is loading, wait
       if (loading) return;
       
-      // If no user after loading completes, redirect to login
-      if (!user) {
+      // Allow access if we have user OR valid Google auth cookie
+      if (!user && !hasGoogleAuthCookie) {
         console.log('❌ [AUTH HOC] No user found in withAuth HOC, redirecting to login');
         router.replace('/login');
       } else {
@@ -335,8 +417,12 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
       )
     }
     
-    // If no user, don't render anything (redirect will happen from the effect)
-    if (!user) {
+    // Check for auth cookies in case session isn't ready yet
+    const cookies = typeof window !== 'undefined' ? getAuthCookies() : null;
+    const hasGoogleAuthCookie = cookies && cookies.auth_success === 'true' && cookies.auth_provider === 'google';
+    
+    // If no user and no auth cookie, don't render anything (redirect will happen from the effect)
+    if (!user && !hasGoogleAuthCookie) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
