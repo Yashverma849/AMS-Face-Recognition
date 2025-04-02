@@ -71,45 +71,90 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign in with email and password
   async function signIn(email: string, password: string) {
     try {
+      console.log(`Attempting to sign in user: ${email}`);
+      
+      // Validate email and password
+      if (!email || !password) {
+        return { 
+          success: false, 
+          message: "Email and password are required" 
+        };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
       if (error) {
-        return { success: false, message: error.message }
+        console.error("Sign in error:", error);
+        return { 
+          success: false, 
+          message: error.message === "Invalid login credentials" 
+            ? "Invalid email or password" 
+            : error.message 
+        };
       }
 
-      return { success: true }
+      if (!data?.session) {
+        console.error("No session returned after successful login");
+        return { 
+          success: false, 
+          message: "Failed to create session" 
+        };
+      }
+
+      console.log(`User signed in successfully: ${email}`);
+      return { success: true };
     } catch (error) {
+      console.error("Unexpected sign in error:", error);
       return { 
         success: false, 
         message: error instanceof Error ? error.message : 'An error occurred during sign in'
-      }
+      };
     }
   }
 
   // Sign up with email and password
   async function signUp(email: string, password: string) {
     try {
+      console.log(`Attempting to sign up user: ${email}`);
+      
+      // Validate email and password
+      if (!email || !password) {
+        return { 
+          success: false, 
+          message: "Email and password are required" 
+        };
+      }
+
+      // Use the configured redirect URL
+      console.log("Using redirect URL for signup:", AUTH_REDIRECT_URL);
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: AUTH_REDIRECT_URL,
         }
-      })
+      });
 
       if (error) {
-        return { success: false, message: error.message }
+        console.error("Sign up error:", error);
+        return { 
+          success: false, 
+          message: error.message 
+        };
       }
 
-      return { success: true }
+      console.log(`User signed up successfully: ${email}`);
+      return { success: true };
     } catch (error) {
+      console.error("Unexpected sign up error:", error);
       return { 
         success: false, 
         message: error instanceof Error ? error.message : 'An error occurred during sign up'
-      }
+      };
     }
   }
 

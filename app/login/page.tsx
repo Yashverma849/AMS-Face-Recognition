@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
+  const { signIn } = useAuth()
   const supabase = createClientComponentClient()
 
   const {
@@ -37,14 +38,10 @@ export default function LoginPage() {
     setErrorMessage("")
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      })
-
-      if (error) {
-        console.error("Login error:", error)
-        setErrorMessage(error.message)
+      const result = await signIn(data.email, data.password)
+      
+      if (!result.success) {
+        setErrorMessage(result.message || "Invalid email or password")
       } else {
         router.push("/dashboard")
         router.refresh()
@@ -63,14 +60,13 @@ export default function LoginPage() {
     setErrorMessage("")
 
     try {
-      // Use the explicit URL to ensure it's correctly formatted
-      const redirectUrl = 'https://amsfacerecognition.vercel.app/auth/callback';
-      console.log("Using redirect URL:", redirectUrl);
+      // Use the configured redirect URL
+      console.log("Using redirect URL:", AUTH_REDIRECT_URL);
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: redirectUrl,
+          redirectTo: AUTH_REDIRECT_URL,
         },
       })
 
