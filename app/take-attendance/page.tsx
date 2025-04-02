@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import DashboardLayout from '@/components/dashboard-layout'
 import FaceCapture from '@/components/face-capture'
-import { takeAttendance } from '@/lib/face-recognition'
+import { takeAttendance } from '@/lib/face-recognition-api'
 import { withAuth } from '@/lib/auth'
 
 interface RecognizedStudent {

@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import DashboardLayout from '@/components/dashboard-layout'
 import FaceCapture from '@/components/face-capture'
-import { registerStudentWithFace } from '@/lib/face-recognition'
+import { registerStudentWithFace } from '@/lib/face-recognition-api'
 import { withAuth } from '@/lib/auth'
 
 function RegisterStudentPage() {

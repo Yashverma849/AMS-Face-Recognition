@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Alert, AlertDescription } from './ui/alert'
-import { initFaceDetection, detectFaces } from '@/lib/face-recognition'
+import { detectFaces } from '@/lib/face-recognition-api'
 
 interface FaceCaptureProps {
   onCapture: (imageData: HTMLCanvasElement) => void
@@ -27,14 +27,6 @@ export default function FaceCapture({
   const [isCaptureReady, setCaptureReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [faceDetected, setFaceDetected] = useState(false)
-  
-  // Initialize face detection
-  useEffect(() => {
-    initFaceDetection().catch(err => {
-      console.error('Error initializing face detection:', err)
-      setError('Failed to initialize face detection models')
-    })
-  }, [])
   
   // Start camera
   const startCamera = async () => {
@@ -82,7 +74,7 @@ export default function FaceCapture({
       const faces = await detectFaces(videoRef.current)
       
       // Log detection results
-      console.log(`Face detection results: ${faces.length} faces found`, faces);
+      console.log(`Face detection results: ${faces.length} faces found`);
       
       // Check if we have valid faces
       const hasFaces = Array.isArray(faces) && faces.length > 0;
