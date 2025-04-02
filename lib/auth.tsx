@@ -174,8 +174,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Sign out
   async function signOut() {
-    await supabase.auth.signOut()
-    router.refresh()
+    try {
+      await supabase.auth.signOut();
+      
+      // Explicitly navigate to home page after signing out
+      router.push('/');
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   }
 
   const value = {

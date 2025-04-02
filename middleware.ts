@@ -21,6 +21,9 @@ export async function middleware(request: NextRequest) {
   // Authentication routes (login/signup)
   const authRoutes = ['/login', '/signup']
   
+  // Public routes that are accessible to everyone
+  const publicRoutes = ['/', '/auth/callback', '/test-auth']
+  
   // Check if the path is a protected route
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   

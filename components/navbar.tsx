@@ -26,8 +26,9 @@ export default function Navbar() {
       })
       await supabase.auth.signOut()
       
-      // Let the middleware handle the redirect
-      router.refresh()
+      // Explicitly navigate to the home page after signing out
+      // instead of just refreshing the current page
+      router.push('/')
     } catch (error) {
       console.error('Error logging out:', error)
     }
