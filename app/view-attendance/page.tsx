@@ -1,390 +1,331 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Download, Filter, Search, Calendar, User } from "lucide-react"
-import DashboardLayout from "@/components/dashboard-layout"
+import React, { useEffect, useState } from 'react'
+import { withAuth } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/client'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import DashboardLayout from '@/components/dashboard-layout'
+import { Calendar, Search, Download, ChevronDown, ChevronUp } from 'lucide-react'
 
-export default function ViewAttendancePage() {
-  const [activeTab, setActiveTab] = useState("sessions")
+interface AttendanceSession {
+  id: string
+  session_name: string
+  timestamp: string
+  student_count: number
+}
 
-  // Mock data for attendance sessions
-  const sessions = [
-    {
-      id: "S001",
-      name: "Morning Lecture",
-      course: "CS101 - Introduction to Programming",
-      date: "2023-04-02",
-      time: "09:00 - 10:30",
-      present: 42,
-      absent: 8,
-      total: 50,
-    },
-    {
-      id: "S002",
-      name: "Lab Session",
-      course: "CS201 - Data Structures",
-      date: "2023-04-01",
-      time: "14:00 - 16:00",
-      present: 38,
-      absent: 12,
-      total: 50,
-    },
-    {
-      id: "S003",
-      name: "Tutorial",
-      course: "CS301 - Database Management",
-      date: "2023-03-31",
-      time: "11:00 - 12:30",
-      present: 45,
-      absent: 5,
-      total: 50,
-    },
-    {
-      id: "S004",
-      name: "Project Discussion",
-      course: "CS401 - Computer Networks",
-      date: "2023-03-30",
-      time: "15:30 - 17:00",
-      present: 40,
-      absent: 10,
-      total: 50,
-    },
-    {
-      id: "S005",
-      name: "Guest Lecture",
-      course: "CS501 - Artificial Intelligence",
-      date: "2023-03-29",
-      time: "10:00 - 11:30",
-      present: 48,
-      absent: 2,
-      total: 50,
-    },
-  ]
+function ViewAttendancePage() {
+  const [sessions, setSessions] = useState<AttendanceSession[]>([])
+  const [filteredSessions, setFilteredSessions] = useState<AttendanceSession[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [sortField, setSortField] = useState<'timestamp' | 'session_name' | 'student_count'>('timestamp')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
-  // Mock data for student attendance
-  const students = [
-    { id: "BPIT2023001", name: "Rahul Sharma", department: "CSE", batch: "2020-2024", attendance: 92 },
-    { id: "BPIT2023002", name: "Priya Patel", department: "IT", batch: "2020-2024", attendance: 88 },
-    { id: "BPIT2023003", name: "Amit Kumar", department: "ECE", batch: "2021-2025", attendance: 95 },
-    { id: "BPIT2023004", name: "Sneha Gupta", department: "CSE", batch: "2021-2025", attendance: 78 },
-    { id: "BPIT2023005", name: "Vikram Singh", department: "ME", batch: "2022-2026", attendance: 85 },
-    { id: "BPIT2023006", name: "Neha Verma", department: "EEE", batch: "2022-2026", attendance: 90 },
-    { id: "BPIT2023007", name: "Raj Malhotra", department: "CSE", batch: "2023-2027", attendance: 82 },
-    { id: "BPIT2023008", name: "Ananya Desai", department: "IT", batch: "2023-2027", attendance: 94 },
-  ]
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const supabase = createClient()
+        
+        // Fetch all attendance sessions
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance')
+          .select('session_id, session_name, timestamp, student_id')
+          .order('timestamp', { ascending: false })
+        
+        if (attendanceError) {
+          throw attendanceError
+        }
+        
+        // Group by session and count students
+        const sessionMap = new Map<string, AttendanceSession>()
+        attendanceData.forEach((record: {
+          session_id: string;
+          session_name: string;
+          timestamp: string;
+          student_id: string;
+        }) => {
+          if (!sessionMap.has(record.session_id)) {
+            sessionMap.set(record.session_id, {
+              id: record.session_id,
+              session_name: record.session_name,
+              timestamp: record.timestamp,
+              student_count: 0
+            })
+          }
+          
+          const session = sessionMap.get(record.session_id)!
+          session.student_count++
+        })
+        
+        // Convert to array and sort by timestamp
+        const allSessions = Array.from(sessionMap.values())
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        
+        setSessions(allSessions)
+        setFilteredSessions(allSessions)
+      } catch (err) {
+        console.error('Error fetching attendance data:', err)
+        setError('Failed to load attendance data')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [])
+  
+  // Handle search and filtering
+  useEffect(() => {
+    let result = [...sessions]
+    
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter(
+        session => session.session_name.toLowerCase().includes(term) || 
+                  session.id.toLowerCase().includes(term)
+      )
+    }
+    
+    // Filter by date range
+    if (startDate) {
+      const start = new Date(startDate)
+      result = result.filter(session => new Date(session.timestamp) >= start)
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999) // Set to end of day
+      result = result.filter(session => new Date(session.timestamp) <= end)
+    }
+    
+    // Sort results
+    result.sort((a, b) => {
+      let comparison = 0
+      
+      if (sortField === 'timestamp') {
+        comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      } else if (sortField === 'session_name') {
+        comparison = a.session_name.localeCompare(b.session_name)
+      } else if (sortField === 'student_count') {
+        comparison = a.student_count - b.student_count
+      }
+      
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+    
+    setFilteredSessions(result)
+  }, [sessions, searchTerm, startDate, endDate, sortField, sortDirection])
+  
+  // Toggle sort direction
+  const handleSort = (field: 'timestamp' | 'session_name' | 'student_count') => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+  
+  // Export data as CSV
+  const exportCSV = () => {
+    if (filteredSessions.length === 0) return
+    
+    const headers = ['Session ID', 'Session Name', 'Date & Time', 'Student Count']
+    const csvContent = [
+      headers.join(','),
+      ...filteredSessions.map(session => [
+        session.id,
+        `"${session.session_name}"`, // Quote to handle commas in names
+        new Date(session.timestamp).toLocaleString(),
+        session.student_count
+      ].join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `attendance_export_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+  
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm('')
+    setStartDate('')
+    setEndDate('')
+    setSortField('timestamp')
+    setSortDirection('desc')
+  }
 
   return (
     <DashboardLayout>
-      <div className="container mx-auto py-8 px-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h1 className="text-3xl font-bold mb-4 md:mb-0">Attendance Records</h1>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button variant="outline" className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Filter
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-          </div>
-        </div>
-
-        <Tabs defaultValue="sessions" className="space-y-6" onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="sessions" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Sessions
-            </TabsTrigger>
-            <TabsTrigger value="students" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Students
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="sessions" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Filter Sessions</CardTitle>
-                <CardDescription>Search and filter attendance sessions by various criteria</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="course-filter">Course</Label>
-                    <Select>
-                      <SelectTrigger id="course-filter">
-                        <SelectValue placeholder="All Courses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Courses</SelectItem>
-                        <SelectItem value="cs101">CS101 - Introduction to Programming</SelectItem>
-                        <SelectItem value="cs201">CS201 - Data Structures</SelectItem>
-                        <SelectItem value="cs301">CS301 - Database Management</SelectItem>
-                        <SelectItem value="cs401">CS401 - Computer Networks</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="date-from">From Date</Label>
-                    <Input id="date-from" type="date" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="date-to">To Date</Label>
-                    <Input id="date-to" type="date" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="session-search">Search</Label>
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                      <Input id="session-search" placeholder="Search sessions..." className="pl-8" />
-                    </div>
-                  </div>
+      <div className="p-6">
+        <h1 className="text-3xl font-bold mb-6">Attendance Records</h1>
+        
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+            <CardDescription>Filter and search attendance sessions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="search">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="search"
+                    placeholder="Search by session name or ID"
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance Sessions</CardTitle>
-                <CardDescription>View all attendance sessions and their details</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border rounded-md overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Session
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Course
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Date & Time
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Attendance
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {sessions.map((session) => (
-                        <tr key={session.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{session.name}</div>
-                            <div className="text-sm text-gray-500">ID: {session.id}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{session.course}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{session.date}</div>
-                            <div className="text-sm text-gray-500">{session.time}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                  className="bg-emerald-600 h-2.5 rounded-full"
-                                  style={{ width: `${(session.present / session.total) * 100}%` }}
-                                ></div>
-                              </div>
-                              <span className="ml-2 text-sm text-gray-500">
-                                {session.present}/{session.total}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <Button variant="link" className="text-emerald-600 hover:text-emerald-700">
-                              View Details
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              </div>
+              
+              <div>
+                <Label htmlFor="startDate">From Date</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="startDate"
+                    type="date"
+                    className="pl-8"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="students" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Filter Students</CardTitle>
-                <CardDescription>Search and filter students by various criteria</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="department-filter">Department</Label>
-                    <Select>
-                      <SelectTrigger id="department-filter">
-                        <SelectValue placeholder="All Departments" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Departments</SelectItem>
-                        <SelectItem value="cse">Computer Science Engineering</SelectItem>
-                        <SelectItem value="it">Information Technology</SelectItem>
-                        <SelectItem value="ece">Electronics & Communication</SelectItem>
-                        <SelectItem value="eee">Electrical Engineering</SelectItem>
-                        <SelectItem value="me">Mechanical Engineering</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="batch-filter">Batch</Label>
-                    <Select>
-                      <SelectTrigger id="batch-filter">
-                        <SelectValue placeholder="All Batches" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Batches</SelectItem>
-                        <SelectItem value="2020-2024">2020-2024</SelectItem>
-                        <SelectItem value="2021-2025">2021-2025</SelectItem>
-                        <SelectItem value="2022-2026">2022-2026</SelectItem>
-                        <SelectItem value="2023-2027">2023-2027</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="attendance-filter">Attendance</Label>
-                    <Select>
-                      <SelectTrigger id="attendance-filter">
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="above-90">Above 90%</SelectItem>
-                        <SelectItem value="75-90">75% - 90%</SelectItem>
-                        <SelectItem value="below-75">Below 75% (Shortage)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="student-search">Search</Label>
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                      <Input id="student-search" placeholder="Search by name or ID..." className="pl-8" />
-                    </div>
-                  </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="endDate">To Date</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="endDate"
+                    type="date"
+                    className="pl-8"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Student Attendance</CardTitle>
-                <CardDescription>View attendance records for all students</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border rounded-md overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Student
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Department
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Batch
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Attendance %
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {students.map((student) => (
-                        <tr key={student.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{student.name}</div>
-                            <div className="text-sm text-gray-500">ID: {student.id}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.department}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.batch}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                  className={`h-2.5 rounded-full ${
-                                    student.attendance >= 90
-                                      ? "bg-emerald-600"
-                                      : student.attendance >= 75
-                                        ? "bg-yellow-500"
-                                        : "bg-red-500"
-                                  }`}
-                                  style={{ width: `${student.attendance}%` }}
-                                ></div>
-                              </div>
-                              <span className="ml-2 text-sm text-gray-500">{student.attendance}%</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <Button variant="link" className="text-emerald-600 hover:text-emerald-700">
-                              View Details
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
+              
+              <div className="flex items-end gap-2">
+                <Button variant="outline" onClick={resetFilters} className="flex-1">
+                  Reset
+                </Button>
+                <Button onClick={exportCSV} className="flex-1" disabled={filteredSessions.length === 0}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Attendance Sessions</CardTitle>
+            <CardDescription>
+              Showing {filteredSessions.length} {filteredSessions.length === 1 ? 'session' : 'sessions'}
+              {filteredSessions.length !== sessions.length && ` (filtered from ${sessions.length})`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : error ? (
+              <div className="text-red-500 text-center py-4">{error}</div>
+            ) : filteredSessions.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="mx-auto h-12 w-12 mb-2 text-gray-400" />
+                <h3 className="text-lg font-medium mb-1">No matching attendance sessions</h3>
+                <p>Try adjusting your filters or take attendance to create new sessions</p>
+              </div>
+            ) : (
+              <div className="border rounded-md overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead 
+                        className="cursor-pointer"
+                        onClick={() => handleSort('session_name')}
+                      >
+                        Session Name
+                        {sortField === 'session_name' && (
+                          sortDirection === 'asc' 
+                            ? <ChevronUp className="inline ml-1 h-4 w-4" /> 
+                            : <ChevronDown className="inline ml-1 h-4 w-4" />
+                        )}
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer"
+                        onClick={() => handleSort('timestamp')}
+                      >
+                        Date & Time
+                        {sortField === 'timestamp' && (
+                          sortDirection === 'asc' 
+                            ? <ChevronUp className="inline ml-1 h-4 w-4" /> 
+                            : <ChevronDown className="inline ml-1 h-4 w-4" />
+                        )}
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer text-right"
+                        onClick={() => handleSort('student_count')}
+                      >
+                        Students
+                        {sortField === 'student_count' && (
+                          sortDirection === 'asc' 
+                            ? <ChevronUp className="inline ml-1 h-4 w-4" /> 
+                            : <ChevronDown className="inline ml-1 h-4 w-4" />
+                        )}
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSessions.map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell className="font-medium">
+                          {session.session_name}
+                          <div className="text-xs text-gray-500">ID: {session.id}</div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(session.timestamp).toLocaleDateString()} {new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </TableCell>
+                        <TableCell className="text-right">{session.student_count}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm">
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   )
 }
+
+export default withAuth(ViewAttendancePage)
 
