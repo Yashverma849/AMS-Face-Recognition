@@ -12,7 +12,8 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/_next') || 
     pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/api')
+    pathname.startsWith('/api') ||
+    pathname === '/'  // Skip middleware for home page entirely
   ) {
     return res
   }
@@ -22,6 +23,8 @@ export async function middleware(request: NextRequest) {
   
   // Get the session
   const { data: { session } } = await supabase.auth.getSession()
+  
+  console.log('Middleware executing for path:', pathname, 'Session exists:', !!session)
   
   // Define route groups
   // Protected routes that require authentication
@@ -43,6 +46,7 @@ export async function middleware(request: NextRequest) {
   
   // Check if this is a public route - always allow
   if (publicRoutes.some(route => pathname === route || pathname.startsWith(route))) {
+    console.log('Public route, allowing access:', pathname)
     return res
   }
   
@@ -69,6 +73,7 @@ export async function middleware(request: NextRequest) {
   }
   
   // Allow all other requests
+  console.log('Allowing access to:', pathname)
   return res
 }
 

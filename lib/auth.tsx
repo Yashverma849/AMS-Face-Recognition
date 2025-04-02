@@ -101,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
+      // First, try to sign in
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -124,6 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
+      // Update local state
+      setSession(data.session);
+      setUser(data.session.user);
+      
       console.log(`User signed in successfully: ${email}`);
       return { success: true };
     } catch (error) {

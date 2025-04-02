@@ -27,6 +27,7 @@ export default function SignupPage() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
+  const { signUp } = useAuth()
   const supabase = createClientComponentClient({
     supabaseUrl: SUPABASE_URL,
     supabaseKey: SUPABASE_ANON_KEY,
@@ -46,37 +47,51 @@ export default function SignupPage() {
     setErrorMessage("")
 
     try {
-      // Use the configured redirect URL instead of hardcoded URL
-      console.log("Using redirect URL for email signup:", AUTH_REDIRECT_URL);
+      // Use the auth context's signUp method
+      const result = await signUp(data.email, data.password);
       
-      const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            first_name: data.firstName,
-            last_name: data.lastName,
+      if (!result.success) {
+        console.error("Signup error:", result.message);
+        setErrorMessage(result.message || "Failed to create account");
+        
+        // Try direct signup as a fallback
+        console.log("Trying direct signup as fallback");
+        const { error } = await supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: {
+            data: {
+              first_name: data.firstName,
+              last_name: data.lastName,
+            },
+            emailRedirectTo: AUTH_REDIRECT_URL,
           },
-          emailRedirectTo: AUTH_REDIRECT_URL,
-        },
-      })
+        });
 
-      if (error) {
-        console.error("Signup error:", error)
-        setErrorMessage(error.message)
+        if (error) {
+          console.error("Direct signup error:", error);
+          setErrorMessage(error.message);
+        } else {
+          // Show success message
+          setErrorMessage("Check your email for the confirmation link.");
+          // Wait for a second to show the message
+          setTimeout(() => {
+            router.push("/login");
+          }, 2000);
+        }
       } else {
-        // Show success message
-        setErrorMessage("Check your email for the confirmation link.")
+        // Success via auth context
+        setErrorMessage("Check your email for the confirmation link.");
         // Wait for a second to show the message
         setTimeout(() => {
-          router.push("/login")
-        }, 2000)
+          router.push("/login");
+        }, 2000);
       }
     } catch (error) {
-      console.error("Unexpected signup error:", error)
-      setErrorMessage("An unexpected error occurred. Please try again.")
+      console.error("Unexpected signup error:", error);
+      setErrorMessage("An unexpected error occurred. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -86,19 +101,25 @@ export default function SignupPage() {
     setErrorMessage("")
 
     try {
-      // Use the configured redirect URL instead of hardcoded URL
-      console.log("Using redirect URL for Google signup:", AUTH_REDIRECT_URL);
+      // Use Supabase OAuth without redirectTo - let Supabase handle it
+      console.log("Initiating Google OAuth flow");
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: AUTH_REDIRECT_URL,
+          queryParams: {
+            // Pass additional parameters to ensure proper redirect
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
-      })
+      });
 
       if (error) {
         console.error("Google sign-up error:", error)
         setErrorMessage(error.message)
+      } else {
+        console.log("Google auth flow initiated successfully");
       }
       // No need to redirect here - OAuth flow handles it
     } catch (error) {

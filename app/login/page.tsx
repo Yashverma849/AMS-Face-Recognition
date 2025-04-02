@@ -50,26 +50,32 @@ export default function LoginPage() {
 
     try {
       console.log("Logging in with:", data.email);
-      console.log("Using direct Supabase client");
       
-      // Try direct Supabase auth instead of context
-      const { data: authData, error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      })
-
-      if (error) {
-        console.error("Login error:", error);
-        console.error("Error code:", error.code);
-        console.error("Error status:", error.status);
-        setErrorMessage(error.message);
-      } else if (authData?.session) {
-        console.log("Login successful, redirecting");
-        router.push("/dashboard");
-        router.refresh();
+      // Use the signIn function from auth context first
+      const result = await signIn(data.email, data.password);
+      
+      if (!result.success) {
+        console.error("Login failed:", result.message);
+        setErrorMessage(result.message || "Invalid email or password");
+        
+        // Try direct login as a fallback
+        console.log("Trying direct login as fallback");
+        const { data: authData, error } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        
+        if (error) {
+          console.error("Direct login error:", error);
+          // Keep the original error message from the context
+        } else if (authData?.session) {
+          console.log("Direct login successful, redirecting");
+          router.push("/dashboard");
+          return; // Exit early on success
+        }
       } else {
-        console.error("No session returned");
-        setErrorMessage("Authentication failed. Please try again.");
+        console.log("Login successful via auth context, redirecting");
+        router.push("/dashboard");
       }
     } catch (error) {
       console.error("Unexpected login error:", error);
