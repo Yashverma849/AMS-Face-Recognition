@@ -5,13 +5,25 @@ import { cookies } from 'next/headers'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const state = requestUrl.searchParams.get('state')
   
   console.log('Auth callback handler received request', { url: request.url });
   console.log('Search params:', Object.fromEntries(requestUrl.searchParams.entries()));
 
+  // Handle potential error from OAuth provider
+  const error = requestUrl.searchParams.get('error')
+  const errorDescription = requestUrl.searchParams.get('error_description')
+  
+  if (error) {
+    console.error('OAuth provider returned an error:', error, errorDescription);
+    return NextResponse.redirect(
+      `${requestUrl.origin}?error=${error}&message=${encodeURIComponent(errorDescription || 'Authentication error')}`
+    )
+  }
+
   if (code) {
     try {
-      console.log('Exchanging code for session...');
+      console.log('Exchanging code for session...', { hasState: !!state });
       
       // Create a Supabase client for the route handler
       const cookieStore = cookies()
