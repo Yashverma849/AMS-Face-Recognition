@@ -12,7 +12,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useForm } from "react-hook-form"
 import { FaGoogle } from "react-icons/fa"
 import { Label } from "@/components/ui/label"
-import { AUTH_REDIRECT_URL } from "@/lib/config"
+import { AUTH_REDIRECT_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config"
 
 type FormData = {
   email: string
@@ -25,7 +25,10 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
   const { signIn } = useAuth()
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient({
+    supabaseUrl: SUPABASE_URL,
+    supabaseKey: SUPABASE_ANON_KEY,
+  })
 
   const {
     register,

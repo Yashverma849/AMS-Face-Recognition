@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Menu, X, LogOut } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config"
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -19,7 +20,10 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      const supabase = createClientComponentClient()
+      const supabase = createClientComponentClient({
+        supabaseUrl: SUPABASE_URL,
+        supabaseKey: SUPABASE_ANON_KEY,
+      })
       await supabase.auth.signOut()
       
       // Let the middleware handle the redirect

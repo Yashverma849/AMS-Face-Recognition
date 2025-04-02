@@ -5,7 +5,7 @@ import { Session, User } from '@supabase/supabase-js'
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { AUTH_REDIRECT_URL } from '@/lib/config'
+import { AUTH_REDIRECT_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/config'
 
 // Auth context type
 type AuthContextType = {
@@ -35,12 +35,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient({
+    supabaseUrl: SUPABASE_URL,
+    supabaseKey: SUPABASE_ANON_KEY,
+  })
 
   useEffect(() => {
     // Get initial session
     const getSession = async () => {
+      console.log("Using Supabase URL:", SUPABASE_URL)
+      console.log("Auth key length:", SUPABASE_ANON_KEY?.length || 0)
+      
       const { data, error } = await supabase.auth.getSession()
+      if (error) {
+        console.error("Session error:", error)
+      }
       if (!error && data?.session) {
         setSession(data.session)
         setUser(data.session.user)

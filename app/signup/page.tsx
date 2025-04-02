@@ -10,7 +10,9 @@ import { FaGoogle } from "react-icons/fa"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { AUTH_REDIRECT_URL } from "@/lib/config"
+import { AUTH_REDIRECT_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from "@/lib/auth"
 
 type FormData = {
   firstName: string
@@ -25,7 +27,10 @@ export default function SignupPage() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient({
+    supabaseUrl: SUPABASE_URL,
+    supabaseKey: SUPABASE_ANON_KEY,
+  })
 
   const {
     register,
