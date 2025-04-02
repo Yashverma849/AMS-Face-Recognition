@@ -76,10 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null)
       setLoading(false)
       
-      // Let the middleware handle redirects
-      if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
+      // Only refresh on sign-in, not sign-out
+      if (_event === 'SIGNED_IN') {
         router.refresh();
       }
+      // Sign-out is handled explicitly in the signOut method
     })
 
     return () => {
@@ -175,12 +176,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign out
   async function signOut() {
     try {
+      // Sign out from Supabase
       await supabase.auth.signOut();
       
-      // Explicitly navigate to home page after signing out
-      router.push('/');
+      // Force clear session data
+      window.localStorage.removeItem('supabase.auth.token');
+      
+      // Add a delay before redirecting
+      setTimeout(() => {
+        // Use replace instead of push to prevent back button returning to protected page
+        router.replace('/');
+      }, 100);
     } catch (error) {
       console.error("Error signing out:", error);
+      // Try to redirect even if there's an error
+      router.replace('/');
     }
   }
 

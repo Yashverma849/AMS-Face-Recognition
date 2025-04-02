@@ -4,46 +4,71 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 // This middleware protects routes and handles redirects based on auth state
 export async function middleware(request: NextRequest) {
+  // Create response to modify
   const res = NextResponse.next()
+  
+  // Skip middleware for public assets and API routes
+  const { pathname } = request.nextUrl
+  if (
+    pathname.startsWith('/_next') || 
+    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/api')
+  ) {
+    return res
+  }
   
   // Create a Supabase client
   const supabase = createMiddlewareClient({ req: request, res })
   
-  // Check if the user is authenticated
+  // Get the session
   const { data: { session } } = await supabase.auth.getSession()
   
-  // Get the pathname from the request
-  const { pathname } = request.nextUrl
-
+  // Define route groups
   // Protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/students', '/attendance', '/profile', '/register-student', '/take-attendance', '/view-attendance']
+  const protectedRoutes = [
+    '/dashboard', 
+    '/students', 
+    '/attendance', 
+    '/profile', 
+    '/register-student', 
+    '/take-attendance', 
+    '/view-attendance'
+  ]
   
   // Authentication routes (login/signup)
   const authRoutes = ['/login', '/signup']
   
-  // Public routes that are accessible to everyone
+  // Public routes - always accessible
   const publicRoutes = ['/', '/auth/callback', '/test-auth']
   
-  // Check if the path is a protected route
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
+  // Check if this is a public route - always allow
+  if (publicRoutes.some(route => pathname === route || pathname.startsWith(route))) {
+    return res
+  }
   
-  // Check if the path is an auth route
+  // Check if this is a protected route
+  const isProtectedRoute = protectedRoutes.some(route => 
+    pathname === route || pathname.startsWith(route)
+  )
+  
+  // Check if this is an auth route
   const isAuthRoute = authRoutes.some(route => pathname === route)
   
-  // If user is not authenticated and tries to access a protected route
+  // Logic for redirects
+  
+  // Case 1: Not logged in, trying to access protected route -> redirect to login
   if (!session && isProtectedRoute) {
-    const redirectUrl = new URL('/login', request.url)
-    console.log('Redirecting unauthenticated user from protected route to:', redirectUrl.toString())
-    return NextResponse.redirect(redirectUrl)
+    console.log('Protected route, no session - redirecting to login')
+    return NextResponse.redirect(new URL('/login', request.url))
   }
   
-  // If user is authenticated and tries to access an auth route
+  // Case 2: Logged in, trying to access auth route -> redirect to dashboard
   if (session && isAuthRoute) {
-    const redirectUrl = new URL('/dashboard', request.url)
-    console.log('Redirecting authenticated user from auth route to:', redirectUrl.toString())
-    return NextResponse.redirect(redirectUrl)
+    console.log('Auth route with session - redirecting to dashboard')
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
   
+  // Allow all other requests
   return res
 }
 
@@ -51,13 +76,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     * - api routes
+     * Match all request paths except static files and images
      */
-    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
   ],
 } 

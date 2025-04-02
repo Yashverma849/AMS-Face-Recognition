@@ -24,13 +24,22 @@ export default function Navbar() {
         supabaseUrl: SUPABASE_URL,
         supabaseKey: SUPABASE_ANON_KEY,
       })
+      
+      // Sign out from Supabase
       await supabase.auth.signOut()
       
-      // Explicitly navigate to the home page after signing out
-      // instead of just refreshing the current page
-      router.push('/')
+      // Force clear any session state
+      window.localStorage.removeItem('supabase.auth.token')
+      
+      // Add a small delay before redirecting
+      setTimeout(() => {
+        // Navigate to home page with replace to prevent back button returning to protected page
+        router.replace('/')
+      }, 100)
     } catch (error) {
       console.error('Error logging out:', error)
+      // Try to redirect to homepage even if there's an error
+      router.replace('/')
     }
   }
 
