@@ -78,14 +78,31 @@ export default function FaceCapture({
     if (!videoRef.current || !isCameraActive) return
     
     try {
+      console.log("Attempting to detect face in video stream...");
       const faces = await detectFaces(videoRef.current)
-      setFaceDetected(faces.length > 0)
-      setCaptureReady(faces.length === 1) // Only ready when exactly one face is detected
+      
+      // Log detection results
+      console.log(`Face detection results: ${faces.length} faces found`, faces);
+      
+      // Check if we have valid faces
+      const hasFaces = Array.isArray(faces) && faces.length > 0;
+      setFaceDetected(hasFaces)
+      setCaptureReady(hasFaces) // Only ready when at least one face is detected
       
       // Continue detecting faces
-      requestAnimationFrame(detectFaceInVideo)
+      if (isCameraActive) {
+        requestAnimationFrame(detectFaceInVideo)
+      }
     } catch (err) {
       console.error('Face detection error:', err)
+      setError('Face detection failed. Please reload the page and try again.')
+      
+      // Retry detection after a delay
+      setTimeout(() => {
+        if (isCameraActive) {
+          detectFaceInVideo()
+        }
+      }, 3000)
     }
   }
   

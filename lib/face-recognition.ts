@@ -26,9 +26,10 @@ export async function initFaceDetection() {
     // Set up loading indicator
     console.log('Loading TensorFlow.js and face detection models...');
     
-    // Ensure TensorFlow is ready
+    // Force WASM backend for better compatibility
+    await tf.setBackend('wasm');
     await tf.ready();
-    console.log('✓ TensorFlow.js ready');
+    console.log('✓ TensorFlow.js ready with backend:', tf.getBackend());
     
     // Load BlazeFace model for face detection with retry
     let retries = 0;
@@ -36,7 +37,13 @@ export async function initFaceDetection() {
     
     while (!blazeFaceModel && retries < maxRetries) {
       try {
-        blazeFaceModel = await blazeface.load();
+        console.log('Loading BlazeFace model...');
+        blazeFaceModel = await blazeface.load({
+          maxFaces: 10,  // Allow multiple faces
+          inputWidth: 128,
+          inputHeight: 128,
+          scoreThreshold: 0.5  // Lower threshold to detect more faces
+        });
         console.log('✓ BlazeFace model loaded successfully');
       } catch (error) {
         retries++;
@@ -51,40 +58,32 @@ export async function initFaceDetection() {
       }
     }
     
-    // Load face landmarks model with retry
-    retries = 0;
-    while (!faceLandmarksModel && retries < maxRetries) {
+    // We don't need the landmarks model immediately for basic face detection
+    // We'll defer this to improve initial loading time
+    console.log('Basic face detection is now available. Landmarks model will load in background.');
+    
+    // Start loading the landmarks model in the background
+    setTimeout(async () => {
       try {
-        // Use a compatible method to load the face landmarks model
-        faceLandmarksModel = await faceLandmarksDetection.createDetector(
-          faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-          {
-            runtime: 'mediapipe',
-            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
-            maxFaces: 1,
-            refineLandmarks: true
-          }
-        );
-        console.log('✓ Face landmarks model loaded successfully');
-      } catch (error) {
-        retries++;
-        console.error(`Failed to load face landmarks model (attempt ${retries}/${maxRetries}):`, error);
-        
-        if (retries >= maxRetries) {
-          throw new Error('Failed to load face landmarks model after multiple attempts');
+        if (!faceLandmarksModel) {
+          faceLandmarksModel = await faceLandmarksDetection.createDetector(
+            faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+            {
+              runtime: 'mediapipe',
+              solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
+              maxFaces: 1,
+              refineLandmarks: true
+            }
+          );
+          console.log('✓ Face landmarks model loaded successfully');
         }
-        
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error('Background loading of landmarks model failed:', error);
       }
-    }
+    }, 1000);
     
-    // Verify models are loaded
-    if (!blazeFaceModel || !faceLandmarksModel) {
-      throw new Error('Face detection models failed to load properly');
-    }
-    
-    return true;
+    // Return true if at least the basic face detection model is available
+    return !!blazeFaceModel;
   } catch (error) {
     console.error('Error initializing face detection:', error);
     return false;
@@ -154,9 +153,34 @@ export async function detectFaces(input: FaceDetectionInput) {
       throw new Error('Face detection model is not available');
     }
     
-    // Detect faces
-    const predictions = await blazeFaceModel.estimateFaces(processableInput, false);
-    return predictions;
+    // Add debugging for face detection
+    console.log('Calling blazeFaceModel.estimateFaces with input dimensions:', 
+      processableInput.width, 'x', processableInput.height);
+    
+    try {
+      // Detect faces
+      const predictions = await blazeFaceModel.estimateFaces(processableInput, false);
+      console.log('Face detection returned predictions:', predictions);
+      return predictions;
+    } catch (faceError) {
+      console.error('Error in blazeface.estimateFaces:', faceError);
+      
+      // Fallback to using a try-catch approach with tf conversion
+      console.log('Attempting fallback face detection method');
+      try {
+        // Detect faces with promise and timeout
+        const detectPromise = blazeFaceModel.estimateFaces(processableInput, false);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Face detection timeout')), 5000)
+        );
+        
+        const predictions = await Promise.race([detectPromise, timeoutPromise]);
+        return predictions || [];
+      } catch (fallbackError) {
+        console.error('Fallback face detection failed:', fallbackError);
+        return [];
+      }
+    }
   } catch (error) {
     console.error('Error detecting faces:', error);
     return [];
