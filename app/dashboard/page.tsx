@@ -30,6 +30,8 @@ interface Student {
   created_at: string
 }
 
+// Updated dashboard to handle empty data - [current date]
+
 function DashboardPage({ user }: DashboardPageProps) {
   const [sessions, setSessions] = useState<AttendanceSession[]>([])
   const [students, setStudents] = useState<Student[]>([])
