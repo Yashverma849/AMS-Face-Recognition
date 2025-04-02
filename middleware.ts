@@ -26,6 +26,12 @@ export async function middleware(request: NextRequest) {
   
   console.log('Middleware executing for path:', pathname, 'Session exists:', !!session)
   
+  // Handle user trying to access the dashboard directly after login
+  if (pathname === '/dashboard' && session) {
+    console.log('Authenticated user accessing dashboard - allowing');
+    return res;
+  }
+  
   // Define route groups
   // Protected routes that require authentication
   const protectedRoutes = [

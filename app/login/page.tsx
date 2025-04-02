@@ -70,12 +70,20 @@ export default function LoginPage() {
           // Keep the original error message from the context
         } else if (authData?.session) {
           console.log("Direct login successful, redirecting");
-          router.push("/dashboard");
+          // Force a small delay before redirect to ensure session is set
+          setTimeout(() => {
+            // Use replace instead of push for cleaner navigation
+            router.replace("/dashboard");
+          }, 100);
           return; // Exit early on success
         }
       } else {
         console.log("Login successful via auth context, redirecting");
-        router.push("/dashboard");
+        // Force a small delay before redirect to ensure session is set
+        setTimeout(() => {
+          // Use replace instead of push for cleaner navigation
+          router.replace("/dashboard");
+        }, 100);
       }
     } catch (error) {
       console.error("Unexpected login error:", error);

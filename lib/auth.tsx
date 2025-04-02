@@ -129,6 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser(data.session.user);
       
+      // Force a state refresh to ensure the session is recognized
+      setTimeout(() => {
+        // This will trigger middleware to recognize the session has changed
+        router.refresh();
+      }, 50);
+      
       console.log(`User signed in successfully: ${email}`);
       return { success: true };
     } catch (error) {
