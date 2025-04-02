@@ -38,11 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+    const getSession = async () => {
+      const { data, error } = await supabase.auth.getSession()
+      if (!error && data?.session) {
+        setSession(data.session)
+        setUser(data.session.user)
+      }
       setLoading(false)
-    })
+    }
+    
+    getSession()
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -90,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app'}/auth/callback`,
         }
       })
 

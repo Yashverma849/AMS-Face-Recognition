@@ -4,8 +4,10 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 // This middleware protects routes and handles redirects based on auth state
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next()
-  const supabase = createMiddlewareClient({ req: request, res: response })
+  const res = NextResponse.next()
+  
+  // Create a Supabase client
+  const supabase = createMiddlewareClient({ req: request, res })
   
   // Check if the user is authenticated
   const { data: { session } } = await supabase.auth.getSession()
@@ -14,7 +16,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/students', '/attendance', '/profile']
+  const protectedRoutes = ['/dashboard', '/students', '/attendance', '/profile', '/register-student', '/take-attendance', '/view-attendance']
   
   // Authentication routes (login/signup)
   const authRoutes = ['/login', '/signup']
@@ -39,7 +41,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
   
-  return response
+  return res
 }
 
 // Configure which paths this middleware is applied to

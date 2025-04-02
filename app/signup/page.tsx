@@ -48,7 +48,7 @@ export default function SignupPage() {
             first_name: data.firstName,
             last_name: data.lastName,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app'}/auth/callback`,
         },
       })
 
@@ -80,7 +80,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app'}/auth/callback`,
         },
       })
 
