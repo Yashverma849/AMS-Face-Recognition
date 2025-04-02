@@ -5,6 +5,7 @@ import { Session, User } from '@supabase/supabase-js'
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { AUTH_REDIRECT_URL } from '@/lib/config'
 
 // Auth context type
 type AuthContextType = {
@@ -95,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         options: {
-          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app'}/auth/callback`,
+          emailRedirectTo: AUTH_REDIRECT_URL,
         }
       })
 

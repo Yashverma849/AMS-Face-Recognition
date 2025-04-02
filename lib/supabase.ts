@@ -1,17 +1,16 @@
 "use client"
 
-import { createClient } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { AUTH_REDIRECT_URL } from './config';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-// Create a single supabase client for the entire application
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create a Supabase client for client components
+export const supabase = createClientComponentClient();
 
 // Helper functions for data operations
 
 // Students
 export async function getStudents() {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase
     .from('students')
     .select('*');
@@ -21,6 +20,7 @@ export async function getStudents() {
 }
 
 export async function getStudent(id: string) {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase
     .from('students')
     .select('*')
@@ -32,6 +32,7 @@ export async function getStudent(id: string) {
 }
 
 export async function createStudent(student: any) {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase
     .from('students')
     .insert([student])
@@ -43,6 +44,7 @@ export async function createStudent(student: any) {
 
 // Sessions
 export async function getAttendanceSessions() {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase
     .from('attendance_sessions')
     .select('*')
@@ -53,6 +55,7 @@ export async function getAttendanceSessions() {
 }
 
 export async function createAttendanceSession(session: any) {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase
     .from('attendance_sessions')
     .insert([session])
@@ -64,6 +67,7 @@ export async function createAttendanceSession(session: any) {
 
 // Records
 export async function getSessionAttendance(sessionId: string) {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase
     .from('attendance_records')
     .select(`
@@ -77,6 +81,7 @@ export async function getSessionAttendance(sessionId: string) {
 }
 
 export async function recordAttendance(records: any[]) {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase
     .from('attendance_records')
     .insert(records)
@@ -88,9 +93,13 @@ export async function recordAttendance(records: any[]) {
 
 // Authentication
 export async function signUp(email: string, password: string) {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: AUTH_REDIRECT_URL,
+    }
   });
   
   if (error) throw error;
@@ -98,6 +107,7 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signIn(email: string, password: string) {
+  const supabase = createClientComponentClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -108,6 +118,7 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
+  const supabase = createClientComponentClient();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 } 

@@ -10,6 +10,7 @@ import { FaGoogle } from "react-icons/fa"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { AUTH_REDIRECT_URL } from "@/lib/config"
 
 type FormData = {
   firstName: string
@@ -48,7 +49,7 @@ export default function SignupPage() {
             first_name: data.firstName,
             last_name: data.lastName,
           },
-          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app'}/auth/callback`,
+          emailRedirectTo: AUTH_REDIRECT_URL,
         },
       })
 
@@ -80,7 +81,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app'}/auth/callback`,
+          redirectTo: AUTH_REDIRECT_URL,
         },
       })
 

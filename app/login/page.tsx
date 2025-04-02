@@ -12,6 +12,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useForm } from "react-hook-form"
 import { FaGoogle } from "react-icons/fa"
 import { Label } from "@/components/ui/label"
+import { AUTH_REDIRECT_URL } from "@/lib/config"
 
 type FormData = {
   email: string
@@ -65,7 +66,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app'}/auth/callback`,
+          redirectTo: AUTH_REDIRECT_URL,
         },
       })
 
