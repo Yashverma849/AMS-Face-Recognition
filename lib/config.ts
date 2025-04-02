@@ -6,7 +6,7 @@ export const APP_URL =
   (typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app');
 
 // Auth configuration
-export const AUTH_REDIRECT_URL = `${APP_URL}/auth/callback`;
+export const AUTH_REDIRECT_URL = `${APP_URL}/auth/callback`.trim();
 
 // Supabase configuration
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';

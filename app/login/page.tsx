@@ -63,10 +63,14 @@ export default function LoginPage() {
     setErrorMessage("")
 
     try {
+      // Use the explicit URL to ensure it's correctly formatted
+      const redirectUrl = 'https://amsfacerecognition.vercel.app/auth/callback';
+      console.log("Using redirect URL:", redirectUrl);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: AUTH_REDIRECT_URL,
+          redirectTo: redirectUrl,
         },
       })
 

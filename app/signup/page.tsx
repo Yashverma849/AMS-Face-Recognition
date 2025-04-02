@@ -41,6 +41,10 @@ export default function SignupPage() {
     setErrorMessage("")
 
     try {
+      // Use the explicit URL to ensure it's correctly formatted
+      const redirectUrl = 'https://amsfacerecognition.vercel.app/auth/callback';
+      console.log("Using redirect URL for email signup:", redirectUrl);
+      
       const { error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -49,7 +53,7 @@ export default function SignupPage() {
             first_name: data.firstName,
             last_name: data.lastName,
           },
-          emailRedirectTo: AUTH_REDIRECT_URL,
+          emailRedirectTo: redirectUrl,
         },
       })
 
@@ -78,10 +82,14 @@ export default function SignupPage() {
     setErrorMessage("")
 
     try {
+      // Use the explicit URL to ensure it's correctly formatted
+      const redirectUrl = 'https://amsfacerecognition.vercel.app/auth/callback';
+      console.log("Using redirect URL for Google signup:", redirectUrl);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: AUTH_REDIRECT_URL,
+          redirectTo: redirectUrl,
         },
       })
 
