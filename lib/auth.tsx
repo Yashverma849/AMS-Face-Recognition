@@ -7,6 +7,9 @@ import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { AUTH_REDIRECT_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/config'
 
+// Debug mode flag
+const DEBUG_AUTH = true;
+
 // Auth context type
 type AuthContextType = {
   session: Session | null
@@ -34,12 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authChangeCount, setAuthChangeCount] = useState(0) // For debugging
   const router = useRouter()
   
   // Debug environment variables
-  console.log("Auth Context - Supabase URL available:", !!SUPABASE_URL);
-  console.log("Auth Context - Supabase key length:", SUPABASE_ANON_KEY?.length || 0);
-  console.log("Auth Context - Redirect URL:", AUTH_REDIRECT_URL);
+  if (DEBUG_AUTH) {
+    console.log("🔍 [AUTH CTX] Initializing auth context");
+    console.log("🔍 [AUTH CTX] Supabase URL available:", !!SUPABASE_URL);
+    console.log("🔍 [AUTH CTX] Supabase key length:", SUPABASE_ANON_KEY?.length || 0);
+    console.log("🔍 [AUTH CTX] Redirect URL:", AUTH_REDIRECT_URL);
+  }
   
   // Initialize Supabase client with explicit config
   const supabase = createClientComponentClient({
@@ -48,36 +55,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   // Debug the client
-  console.log("Supabase client initialized:", !!supabase);
+  if (DEBUG_AUTH) {
+    console.log("🔍 [AUTH CTX] Supabase client initialized:", !!supabase);
+  }
 
   useEffect(() => {
     // Get initial session
     const getSession = async () => {
-      console.log("Using Supabase URL:", SUPABASE_URL)
-      console.log("Auth key length:", SUPABASE_ANON_KEY?.length || 0)
+      if (DEBUG_AUTH) {
+        console.log("🔍 [AUTH CTX] Getting initial session");
+        console.log("🔍 [AUTH CTX] Using Supabase URL:", SUPABASE_URL)
+        console.log("🔍 [AUTH CTX] Auth key length:", SUPABASE_ANON_KEY?.length || 0)
+      }
       
-      const { data, error } = await supabase.auth.getSession()
-      if (error) {
-        console.error("Session error:", error)
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error("❌ [AUTH CTX] Session error:", error)
+        }
+        
+        if (!error && data?.session) {
+          if (DEBUG_AUTH) {
+            console.log("✅ [AUTH CTX] Initial session found for user:", data.session.user?.email);
+            console.log("🔍 [AUTH CTX] Session expires at:", new Date((data.session.expires_at || 0) * 1000).toISOString());
+          }
+          setSession(data.session)
+          setUser(data.session.user)
+        } else {
+          if (DEBUG_AUTH) {
+            console.log("⚠️ [AUTH CTX] No initial session found");
+          }
+        }
+        
+        setLoading(false)
+      } catch (err) {
+        console.error("❌ [AUTH CTX] Unexpected error getting session:", err);
+        setLoading(false);
       }
-      if (!error && data?.session) {
-        setSession(data.session)
-        setUser(data.session.user)
-      }
-      setLoading(false)
     }
     
     getSession()
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("Auth state changed:", _event, session?.user?.email);
+      // Increment change counter for debugging
+      setAuthChangeCount(prev => prev + 1);
+      
+      if (DEBUG_AUTH) {
+        console.log(`🔍 [AUTH CTX] Auth state changed (${_event}):`, !!session);
+        console.log("🔍 [AUTH CTX] Change #:", authChangeCount + 1);
+        console.log("🔍 [AUTH CTX] User email:", session?.user?.email);
+        console.log("🔍 [AUTH CTX] Event:", _event);
+        
+        if (session?.expires_at) {
+          console.log("🔍 [AUTH CTX] Session expires:", new Date(session.expires_at * 1000).toISOString());
+        }
+      }
+      
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
       
       // Only refresh on sign-in, not sign-out
       if (_event === 'SIGNED_IN') {
+        if (DEBUG_AUTH) {
+          console.log("✅ [AUTH CTX] User signed in, refreshing router");
+        }
         router.refresh();
       }
       // Sign-out is handled explicitly in the signOut method
@@ -86,12 +130,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [router, supabase])
+  }, [router, supabase, authChangeCount])
 
   // Sign in with email and password
   async function signIn(email: string, password: string) {
     try {
-      console.log(`Attempting to sign in user: ${email}`);
+      if (DEBUG_AUTH) {
+        console.log(`🔍 [AUTH CTX] Attempting to sign in user: ${email}`);
+      }
       
       // Validate email and password
       if (!email || !password) {
@@ -108,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error("Sign in error:", error);
+        console.error("❌ [AUTH CTX] Sign in error:", error);
         return { 
           success: false, 
           message: error.message === "Invalid login credentials" 
@@ -118,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!data?.session) {
-        console.error("No session returned after successful login");
+        console.error("❌ [AUTH CTX] No session returned after successful login");
         return { 
           success: false, 
           message: "Failed to create session" 
@@ -129,16 +175,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser(data.session.user);
       
+      if (DEBUG_AUTH) {
+        console.log(`✅ [AUTH CTX] User ${email} signed in successfully`);
+        console.log(`🔍 [AUTH CTX] Session expires at: ${new Date((data.session.expires_at || 0) * 1000).toISOString()}`);
+      }
+      
       // Force a state refresh to ensure the session is recognized
       setTimeout(() => {
         // This will trigger middleware to recognize the session has changed
         router.refresh();
       }, 50);
       
-      console.log(`User signed in successfully: ${email}`);
       return { success: true };
     } catch (error) {
-      console.error("Unexpected sign in error:", error);
+      console.error("❌ [AUTH CTX] Unexpected sign in error:", error);
       return { 
         success: false, 
         message: error instanceof Error ? error.message : 'An error occurred during sign in'
@@ -149,7 +199,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign up with email and password
   async function signUp(email: string, password: string) {
     try {
-      console.log(`Attempting to sign up user: ${email}`);
+      if (DEBUG_AUTH) {
+        console.log(`🔍 [AUTH CTX] Attempting to sign up user: ${email}`);
+      }
       
       // Validate email and password
       if (!email || !password) {
@@ -166,17 +218,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error("Sign up error:", error);
+        console.error("❌ [AUTH CTX] Sign up error:", error);
         return { 
           success: false, 
           message: error.message 
         };
       }
 
-      console.log(`User signed up successfully: ${email}`);
+      if (DEBUG_AUTH) {
+        console.log(`✅ [AUTH CTX] User ${email} signed up successfully`);
+        console.log(`🔍 [AUTH CTX] Email confirmation needed: ${!data.session}`);
+      }
+      
       return { success: true };
     } catch (error) {
-      console.error("Unexpected sign up error:", error);
+      console.error("❌ [AUTH CTX] Unexpected sign up error:", error);
       return { 
         success: false, 
         message: error instanceof Error ? error.message : 'An error occurred during sign up'
@@ -187,19 +243,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign out
   async function signOut() {
     try {
+      if (DEBUG_AUTH) {
+        console.log("🔍 [AUTH CTX] Signing out user:", user?.email);
+      }
+      
       // Sign out from Supabase
       await supabase.auth.signOut();
+      
+      if (DEBUG_AUTH) {
+        console.log("🔍 [AUTH CTX] Signed out from Supabase API");
+      }
       
       // Force clear session data
       window.localStorage.removeItem('supabase.auth.token');
       
+      if (DEBUG_AUTH) {
+        console.log("🔍 [AUTH CTX] Cleared local storage token");
+      }
+      
       // Add a delay before redirecting
       setTimeout(() => {
+        if (DEBUG_AUTH) {
+          console.log("🔍 [AUTH CTX] Redirecting to home page after signout");
+        }
         // Use replace instead of push to prevent back button returning to protected page
         router.replace('/');
       }, 100);
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("❌ [AUTH CTX] Error signing out:", error);
       // Try to redirect even if there's an error
       router.replace('/');
     }
@@ -232,13 +303,26 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
       // Skip during server-side rendering
       if (typeof window === 'undefined') return;
       
+      if (DEBUG_AUTH) {
+        console.log('🔍 [AUTH HOC] withAuth authentication check');
+        console.log('🔍 [AUTH HOC] Loading:', loading);
+        console.log('🔍 [AUTH HOC] User present:', !!user);
+        if (user) {
+          console.log('🔍 [AUTH HOC] User email:', user.email);
+        }
+      }
+      
       // If authentication is loading, wait
       if (loading) return;
       
       // If no user after loading completes, redirect to login
       if (!user) {
-        console.log('No user found in withAuth HOC, redirecting to login');
+        console.log('❌ [AUTH HOC] No user found in withAuth HOC, redirecting to login');
         router.replace('/login');
+      } else {
+        if (DEBUG_AUTH) {
+          console.log('✅ [AUTH HOC] User authenticated in withAuth HOC');
+        }
       }
     }, [user, loading, router]);
 

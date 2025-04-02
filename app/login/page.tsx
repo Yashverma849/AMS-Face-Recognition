@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
@@ -23,14 +23,67 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [authDebugInfo, setAuthDebugInfo] = useState<any>(null)
   const router = useRouter()
   const { signIn } = useAuth()
   
   // Debug logging for environment variables
-  console.log("Supabase URL:", SUPABASE_URL);
-  console.log("Supabase key length:", SUPABASE_ANON_KEY?.length || 0);
-  console.log("Supabase key first 10 chars:", SUPABASE_ANON_KEY?.substring(0, 10) || 'none');
-  console.log("Auth redirect URL:", AUTH_REDIRECT_URL);
+  console.log("🔍 [LOGIN] Supabase URL:", SUPABASE_URL);
+  console.log("🔍 [LOGIN] Supabase key length:", SUPABASE_ANON_KEY?.length || 0);
+  console.log("🔍 [LOGIN] Auth redirect URL:", AUTH_REDIRECT_URL);
+  
+  // Read debug cookies on page load
+  useEffect(() => {
+    // Check for debug cookies that may have been set during OAuth flow
+    const authCookies = document.cookie
+      .split(';')
+      .map(cookie => cookie.trim().split('='))
+      .filter(([name]) => name.startsWith('auth_'))
+      .reduce((acc, [name, value]) => ({ ...acc, [name]: value }), {});
+    
+    if (Object.keys(authCookies).length > 0) {
+      console.log('🔍 [LOGIN] Auth debug cookies found:', authCookies);
+      setAuthDebugInfo(authCookies);
+      
+      // We could clear them here if desired
+      // Object.keys(authCookies).forEach(name => {
+      //   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+      // });
+    }
+    
+    // Check URL for error parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const message = urlParams.get('message');
+    
+    if (error) {
+      console.error('❌ [LOGIN] Error in URL parameters:', error, message);
+      setErrorMessage(message || 'Authentication error occurred');
+    }
+    
+    // Dump current auth state
+    const checkSession = async () => {
+      try {
+        const supabase = createClientComponentClient({
+          supabaseUrl: SUPABASE_URL,
+          supabaseKey: SUPABASE_ANON_KEY,
+        });
+        
+        const { data, error } = await supabase.auth.getSession();
+        console.log('🔍 [LOGIN] Current session:', !!data?.session);
+        if (data?.session) {
+          console.log('🔍 [LOGIN] Logged in as:', data.session.user?.email);
+        }
+        if (error) {
+          console.error('❌ [LOGIN] Session check error:', error);
+        }
+      } catch (err) {
+        console.error('❌ [LOGIN] Failed to check session:', err);
+      }
+    };
+    
+    checkSession();
+  }, []);
   
   // Initialize Supabase client directly with raw values for testing
   const supabase = createClientComponentClient({
@@ -49,27 +102,27 @@ export default function LoginPage() {
     setErrorMessage("")
 
     try {
-      console.log("Logging in with:", data.email);
+      console.log("🔍 [LOGIN] Logging in with:", data.email);
       
       // Use the signIn function from auth context first
       const result = await signIn(data.email, data.password);
       
       if (!result.success) {
-        console.error("Login failed:", result.message);
+        console.error("❌ [LOGIN] Login failed:", result.message);
         setErrorMessage(result.message || "Invalid email or password");
         
         // Try direct login as a fallback
-        console.log("Trying direct login as fallback");
+        console.log("🔍 [LOGIN] Trying direct login as fallback");
         const { data: authData, error } = await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
         });
         
         if (error) {
-          console.error("Direct login error:", error);
+          console.error("❌ [LOGIN] Direct login error:", error);
           // Keep the original error message from the context
         } else if (authData?.session) {
-          console.log("Direct login successful, redirecting");
+          console.log("✅ [LOGIN] Direct login successful, redirecting");
           // Force a small delay before redirect to ensure session is set
           setTimeout(() => {
             // Use replace instead of push for cleaner navigation
@@ -78,7 +131,7 @@ export default function LoginPage() {
           return; // Exit early on success
         }
       } else {
-        console.log("Login successful via auth context, redirecting");
+        console.log("✅ [LOGIN] Login successful via auth context, redirecting");
         // Force a small delay before redirect to ensure session is set
         setTimeout(() => {
           // Use replace instead of push for cleaner navigation
@@ -86,7 +139,7 @@ export default function LoginPage() {
         }, 100);
       }
     } catch (error) {
-      console.error("Unexpected login error:", error);
+      console.error("❌ [LOGIN] Unexpected login error:", error);
       setErrorMessage("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
@@ -94,11 +147,15 @@ export default function LoginPage() {
   }
 
   const handleGoogleSignIn = async () => {
-    console.log("Starting Google sign-in process");
+    console.log("🔍 [LOGIN] Starting Google sign-in process");
     setGoogleLoading(true);
     setErrorMessage("");
 
     try {
+      // Log window location for debugging
+      console.log("🔍 [LOGIN] Current origin:", window.location.origin);
+      console.log("🔍 [LOGIN] Current URL:", window.location.href);
+      
       // For Google OAuth, we need to use the Supabase flow with proper redirects
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -112,14 +169,17 @@ export default function LoginPage() {
       });
 
       if (error) {
-        console.error("Google sign-in error:", error);
+        console.error("❌ [LOGIN] Google sign-in error:", error);
         setErrorMessage(error.message);
       } else {
-        console.log("Google auth initiated successfully, redirecting to provider...");
+        console.log("✅ [LOGIN] Google auth initiated successfully");
+        console.log("🔍 [LOGIN] Auth URL:", data?.url || 'No URL provided');
+        console.log("🔍 [LOGIN] Provider:", data?.provider || 'No provider specified');
+        console.log("🔍 [LOGIN] Redirecting to provider...");
         // The browser will be redirected to Google's auth page by Supabase automatically
       }
     } catch (error) {
-      console.error("Unexpected Google sign-in error:", error);
+      console.error("❌ [LOGIN] Unexpected Google sign-in error:", error);
       setErrorMessage("An unexpected error occurred with Google sign-in. Please try again.");
     } finally {
       setGoogleLoading(false);
@@ -132,6 +192,11 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle>Login</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
+          {authDebugInfo && (
+            <div className="p-2 bg-amber-100 text-amber-800 text-xs rounded mt-2">
+              <p>Auth debug info: {JSON.stringify(authDebugInfo)}</p>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
