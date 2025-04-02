@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from './supabase'
 import { Session, User } from '@supabase/supabase-js'
 import React from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 // Auth context type
 type AuthContextType = {
@@ -118,32 +120,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // Redirect if not authenticated
 export function withAuth<P extends object>(Component: React.ComponentType<P>) {
-  return function AuthenticatedComponent(props: P & { user?: User }) {
+  return function AuthenticatedComponent(props: P) {
     const { user, loading } = useAuth()
-    const [mounted, setMounted] = useState(false)
+    const router = useRouter()
 
     useEffect(() => {
-      setMounted(true)
-    }, [])
-
-    // When the component first mounts, we're in SSR mode
-    // We don't want to show anything until we're in the browser
-    if (!mounted) return null
-
-    // Show loading indicator
-    if (loading) {
-      return <div>Loading...</div>
-    }
-
-    // Redirect to login if not authenticated
-    if (!user) {
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+      const checkUser = async () => {
+        const supabase = createClient()
+        
+        try {
+          // Get current session
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (error) throw error
+          
+          if (!session) {
+            // Change this to redirect to home page
+            router.push('/')
+            return
+          }
+          
+          // If authenticated, render the component
+          return <Component {...props as P} user={session.user} />
+        } catch (error) {
+          console.error('Authentication error:', error)
+          // Also change this to redirect to home page
+          router.push('/')
+        }
       }
-      return null
+      
+      checkUser()
+    }, [router])
+
+    if (loading) {
+      return <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      </div>
+    }
+    
+    if (!user) {
+      return null // Let the useEffect redirect
     }
 
-    // If authenticated, render the component
     return <Component {...props as P} user={user} />
   }
 } 

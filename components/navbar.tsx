@@ -3,16 +3,30 @@
 import Link from "next/link"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
-import { usePathname } from "next/navigation"
+import { Menu, X, LogOut } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
   const isLoggedIn = pathname !== "/" && pathname !== "/login" && pathname !== "/signup"
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
+  }
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      
+      // Force navigation to home page using window.location
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
   }
 
   return (
@@ -51,7 +65,8 @@ export default function Navbar() {
               >
                 View Attendance
               </Link>
-              <Button variant="outline" className="ml-4">
+              <Button variant="outline" className="ml-4" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
             </>
@@ -107,7 +122,8 @@ export default function Navbar() {
                 >
                   View Attendance
                 </Link>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
                   Logout
                 </Button>
               </>

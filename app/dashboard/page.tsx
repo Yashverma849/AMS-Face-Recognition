@@ -7,8 +7,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { UserPlus, Users, Clock } from 'lucide-react'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { UserPlus, Users, Clock, PlusCircle } from 'lucide-react'
 import DashboardLayout from '@/components/dashboard-layout'
 
 interface DashboardPageProps {
@@ -49,29 +49,32 @@ function DashboardPage({ user }: DashboardPageProps) {
           .limit(100)
         
         if (attendanceError) {
-          throw attendanceError
+          console.warn("Attendance fetch warning:", attendanceError)
+          // Continue execution, don't throw
         }
         
         // Group by session and count students
         const sessionMap = new Map<string, AttendanceSession>()
-        attendanceData.forEach((record: {
-          session_id: string;
-          session_name: string;
-          timestamp: string;
-          student_id: string;
-        }) => {
-          if (!sessionMap.has(record.session_id)) {
-            sessionMap.set(record.session_id, {
-              id: record.session_id,
-              session_name: record.session_name,
-              timestamp: record.timestamp,
-              student_count: 0
-            })
-          }
-          
-          const session = sessionMap.get(record.session_id)!
-          session.student_count++
-        })
+        if (attendanceData && attendanceData.length > 0) {
+          attendanceData.forEach((record: {
+            session_id: string;
+            session_name: string;
+            timestamp: string;
+            student_id: string;
+          }) => {
+            if (!sessionMap.has(record.session_id)) {
+              sessionMap.set(record.session_id, {
+                id: record.session_id,
+                session_name: record.session_name,
+                timestamp: record.timestamp,
+                student_count: 0
+              })
+            }
+            
+            const session = sessionMap.get(record.session_id)!
+            session.student_count++
+          })
+        }
         
         // Convert to array and sort by timestamp
         const recentSessions = Array.from(sessionMap.values())
@@ -88,13 +91,14 @@ function DashboardPage({ user }: DashboardPageProps) {
           .limit(5)
         
         if (studentsError) {
-          throw studentsError
+          console.warn("Students fetch warning:", studentsError)
+          // Continue execution, don't throw
         }
         
-        setStudents(studentsData)
+        setStudents(studentsData || [])
       } catch (err) {
         console.error('Error fetching dashboard data:', err)
-        setError('Failed to load dashboard data')
+        setError('Something went wrong while loading the dashboard')
       } finally {
         setLoading(false)
       }
@@ -154,7 +158,13 @@ function DashboardPage({ user }: DashboardPageProps) {
                 <div className="text-center py-8 text-gray-500">
                   <Clock className="mx-auto h-12 w-12 mb-2 text-gray-400" />
                   <h3 className="text-lg font-medium mb-1">No attendance sessions yet</h3>
-                  <p>Take attendance to see records here</p>
+                  <p className="mb-4">Take attendance to see records here</p>
+                  <Button asChild>
+                    <Link href="/take-attendance">
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Take Attendance
+                    </Link>
+                  </Button>
                 </div>
               ) : (
                 <Table>
@@ -202,7 +212,13 @@ function DashboardPage({ user }: DashboardPageProps) {
                 <div className="text-center py-8 text-gray-500">
                   <Users className="mx-auto h-12 w-12 mb-2 text-gray-400" />
                   <h3 className="text-lg font-medium mb-1">No students registered yet</h3>
-                  <p>Register students to see them here</p>
+                  <p className="mb-4">Register students to see them here</p>
+                  <Button asChild>
+                    <Link href="/register-student">
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Register Student
+                    </Link>
+                  </Button>
                 </div>
               ) : (
                 <Table>
