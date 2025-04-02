@@ -99,19 +99,12 @@ export default function LoginPage() {
     setErrorMessage("");
 
     try {
-      // Use the Supabase OAuth callback URL directly - this is important!
-      // The Google OAuth flow needs to go through Supabase first, not directly to our app
-      const supabaseCallbackUrl = `https://rajdykbhqzagupzdfqix.supabase.co/auth/v1/callback`;
-      
-      console.log("Using Supabase callback URL for Google auth:", supabaseCallbackUrl);
-      
+      // For Google OAuth, we need to use the Supabase flow with proper redirects
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          // Do NOT set redirectTo for OAuth - let Supabase handle it
-          // The redirectTo is handled in the Supabase Dashboard settings
+          redirectTo: `${window.location.origin}/auth/callback`, // Explicitly set to current origin + callback path
           queryParams: {
-            // Pass additional parameters to ensure proper redirect
             access_type: 'offline',
             prompt: 'consent',
           },
@@ -122,9 +115,9 @@ export default function LoginPage() {
         console.error("Google sign-in error:", error);
         setErrorMessage(error.message);
       } else {
-        console.log("Google auth initiated successfully:", data);
+        console.log("Google auth initiated successfully, redirecting to provider...");
+        // The browser will be redirected to Google's auth page by Supabase automatically
       }
-      // No need to redirect here - OAuth flow handles it
     } catch (error) {
       console.error("Unexpected Google sign-in error:", error);
       setErrorMessage("An unexpected error occurred with Google sign-in. Please try again.");

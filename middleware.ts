@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
   // Create response to modify
   const res = NextResponse.next()
   
-  // Skip middleware for public assets and API routes
+  // Skip middleware for public assets, API routes and home page
   const { pathname } = request.nextUrl
   if (
     pathname.startsWith('/_next') || 
@@ -16,6 +16,12 @@ export async function middleware(request: NextRequest) {
     pathname === '/'  // Skip middleware for home page entirely
   ) {
     return res
+  }
+  
+  // Skip middleware for the auth callback page - this is critical for OAuth
+  if (pathname.startsWith('/auth/callback')) {
+    console.log('Auth callback path, skipping middleware');
+    return res;
   }
   
   // Create a Supabase client

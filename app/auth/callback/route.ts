@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     try {
       console.log('Exchanging code for session...', { hasState: !!state });
       
-      // Create a Supabase client for the route handler with explicit credentials
+      // Create a Supabase client for the route handler
       const cookieStore = cookies()
       const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
       
@@ -48,11 +48,20 @@ export async function GET(request: Request) {
 
       console.log('Successfully exchanged code for session, user:', data?.session?.user?.email);
       
-      // Redirect to dashboard
-      return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
-    } catch (error) {
-      console.error('Unexpected error in auth callback:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Set a cookie to indicate successful Google sign-in
+      // This helps identify the source of the authentication when redirected back
+      const response = NextResponse.redirect(`${requestUrl.origin}/dashboard`)
+      response.cookies.set('oauth_provider', 'google', { 
+        path: '/',
+        maxAge: 60 * 5, // 5 minutes
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production'
+      })
+      
+      return response
+    } catch (err) {
+      console.error('Unexpected error in auth callback:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       return NextResponse.redirect(`${requestUrl.origin}?error=auth_callback_error&message=${encodeURIComponent(errorMessage)}`)
     }
   }

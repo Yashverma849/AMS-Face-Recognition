@@ -225,7 +225,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function withAuth<P extends object>(Component: React.ComponentType<P>) {
   return function AuthenticatedComponent(props: P) {
     const { user, loading } = useAuth()
+    const router = useRouter()
 
+    // Effect to check authentication
+    useEffect(() => {
+      // Skip during server-side rendering
+      if (typeof window === 'undefined') return;
+      
+      // If authentication is loading, wait
+      if (loading) return;
+      
+      // If no user after loading completes, redirect to login
+      if (!user) {
+        console.log('No user found in withAuth HOC, redirecting to login');
+        router.replace('/login');
+      }
+    }, [user, loading, router]);
+
+    // Show loading state
     if (loading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
@@ -234,7 +251,16 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
       )
     }
     
-    // The middleware will handle redirects, so we can just render the component
+    // If no user, don't render anything (redirect will happen from the effect)
+    if (!user) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      );
+    }
+    
+    // Pass user prop along with other props to the wrapped component
     return <Component {...props as P} user={user} />
   }
 } 
