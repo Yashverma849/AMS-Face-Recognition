@@ -2,15 +2,15 @@
 
 // Application URLs
 export const APP_URL = 
-  process.env.NEXT_PUBLIC_APP_URL || 
-  (typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app');
+  (process.env.NEXT_PUBLIC_APP_URL || 
+  (typeof window !== 'undefined' ? window.location.origin : 'https://amsfacerecognition.vercel.app')).trim();
 
 // Auth configuration
 export const AUTH_REDIRECT_URL = `${APP_URL}/auth/callback`.trim();
 
 // Supabase configuration
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+export const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+export const SUPABASE_ANON_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
 // Face recognition configuration
 export const FACE_SIMILARITY_THRESHOLD = 0.7; // Threshold for face matching (0-1)

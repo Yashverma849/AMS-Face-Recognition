@@ -2,12 +2,17 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
+// We need to access environment variables directly in server components
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const state = requestUrl.searchParams.get('state')
   
   console.log('Auth callback handler received request', { url: request.url });
+  console.log('Using Supabase URL:', supabaseUrl);
   console.log('Search params:', Object.fromEntries(requestUrl.searchParams.entries()));
 
   // Handle potential error from OAuth provider
@@ -25,9 +30,13 @@ export async function GET(request: Request) {
     try {
       console.log('Exchanging code for session...', { hasState: !!state });
       
-      // Create a Supabase client for the route handler
+      // Create a Supabase client for the route handler with explicit credentials
       const cookieStore = cookies()
       const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+      
+      // Log the environment data
+      console.log('Supabase URL available:', !!supabaseUrl);
+      console.log('Supabase key length:', supabaseAnonKey?.length || 0);
       
       // Exchange the code for a session
       const { data, error } = await supabase.auth.exchangeCodeForSession(code)

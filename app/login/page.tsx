@@ -64,33 +64,42 @@ export default function LoginPage() {
   }
 
   const handleGoogleSignIn = async () => {
-    console.log("Starting Google sign-in process")
-    setGoogleLoading(true)
-    setErrorMessage("")
+    console.log("Starting Google sign-in process");
+    console.log("Auth redirect URL exact value:", AUTH_REDIRECT_URL);
+    setGoogleLoading(true);
+    setErrorMessage("");
 
     try {
-      // Use the configured redirect URL
-      console.log("Using redirect URL:", AUTH_REDIRECT_URL);
+      // Ensure URL is properly formatted with no spaces
+      const redirectUrl = AUTH_REDIRECT_URL.trim();
+      console.log("Using redirect URL for Google auth:", redirectUrl);
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: AUTH_REDIRECT_URL,
+          redirectTo: redirectUrl,
+          queryParams: {
+            // Pass additional parameters to ensure proper redirect
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
-      })
+      });
 
       if (error) {
-        console.error("Google sign-in error:", error)
-        setErrorMessage(error.message)
+        console.error("Google sign-in error:", error);
+        setErrorMessage(error.message);
+      } else {
+        console.log("Google auth initiated successfully:", data);
       }
       // No need to redirect here - OAuth flow handles it
     } catch (error) {
-      console.error("Unexpected Google sign-in error:", error)
-      setErrorMessage("An unexpected error occurred with Google sign-in. Please try again.")
+      console.error("Unexpected Google sign-in error:", error);
+      setErrorMessage("An unexpected error occurred with Google sign-in. Please try again.");
     } finally {
-      setGoogleLoading(false)
+      setGoogleLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex justify-center items-center min-h-screen">
