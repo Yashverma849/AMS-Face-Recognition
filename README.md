@@ -101,4 +101,58 @@ A face recognition-based attendance management system for Bhagwan Parshuram Inst
 
 ## Contributors
 
-- [Your Name](https://github.com/yourusername) 
+- [Your Name](https://github.com/yourusername)
+
+## Deployment Instructions
+
+This project consists of two parts:
+1. **Next.js Frontend**: Automatically deployed to Vercel
+2. **Python Backend API**: Must be deployed separately
+
+### Frontend Deployment
+
+The frontend is configured to deploy automatically to Vercel and excludes the Python API code.
+
+### Python API Deployment
+
+The Python API requires:
+- Python 3.8+ with build tools
+- CMake and dlib dependencies
+
+**Option 1: Run API on a server (recommended)**
+1. Set up a server with Python and required dependencies
+2. Clone the repository
+3. Install dependencies: `cd api && pip install -r requirements.txt`
+4. Run the server: `python -m uvicorn main:app --host 0.0.0.0 --port 8000`
+5. Set the environment variable `NEXT_PUBLIC_FACE_API_URL` to your API URL in Vercel
+
+**Option 2: Use a serverless Python provider**
+- Deploy to a service like AWS Lambda, Google Cloud Functions, or Render that supports Python APIs
+- Make sure to include build steps for installing dlib
+
+## Local Development
+
+To run the application locally:
+1. Start the Python API: 
+   ```
+   cd api
+   pip install -r requirements.txt
+   python -m uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+
+2. In a separate terminal, start the Next.js frontend:
+   ```
+   npm install
+   npm run dev
+   ```
+
+Alternatively, use the provided start script:
+```
+start_app.bat
+```
+
+## Important Notes
+
+- The Face Recognition API requires dlib which needs C++ build tools and CMake
+- Vercel cannot build Python packages with binary dependencies
+- For production, deploy the API on a separate service and update the API URL 

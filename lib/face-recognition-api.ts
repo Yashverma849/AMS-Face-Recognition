@@ -2,8 +2,107 @@
 
 import { FaceDetectionInput } from './face-recognition';
 
-// API endpoint URL
-const API_URL = process.env.NEXT_PUBLIC_FACE_API_URL || 'http://localhost:8000';
+// API client for the Python face recognition backend
+
+export const API_URL = process.env.NEXT_PUBLIC_FACE_API_URL || 'http://localhost:8000';
+
+/**
+ * Convert a base64 image to a blob for API upload
+ */
+export const base64ToBlob = (base64: string, type = 'image/jpeg'): Blob => {
+  const byteString = atob(base64.split(',')[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  
+  return new Blob([ab], { type });
+};
+
+/**
+ * Detect faces in the provided image
+ */
+export const detectFaces = async (imageData: string): Promise<any> => {
+  try {
+    console.log("🔍 Detecting faces with API at:", API_URL);
+    
+    const formData = new FormData();
+    const blob = base64ToBlob(imageData);
+    formData.append('image', blob, 'image.jpg');
+    
+    const response = await fetch(`${API_URL}/detect-faces`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error detecting faces:', error);
+    throw error;
+  }
+};
+
+/**
+ * Register a new student face
+ */
+export const registerFace = async (imageData: string, studentId: string, name: string): Promise<any> => {
+  try {
+    console.log(`🔍 Registering face for student ${studentId} with API at:`, API_URL);
+    
+    const formData = new FormData();
+    const blob = base64ToBlob(imageData);
+    formData.append('image', blob, 'image.jpg');
+    formData.append('student_id', studentId);
+    formData.append('name', name);
+    
+    const response = await fetch(`${API_URL}/register-face`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error registering face:', error);
+    throw error;
+  }
+};
+
+/**
+ * Recognize faces in the provided image
+ */
+export const recognizeFaces = async (imageData: string): Promise<any> => {
+  try {
+    console.log("🔍 Recognizing faces with API at:", API_URL);
+    
+    const formData = new FormData();
+    const blob = base64ToBlob(imageData);
+    formData.append('image', blob, 'image.jpg');
+    
+    const response = await fetch(`${API_URL}/recognize-faces`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error recognizing faces:', error);
+    throw error;
+  }
+};
 
 /**
  * Convert image to base64
@@ -49,44 +148,6 @@ export async function convertToBase64(input: FaceDetectionInput): Promise<string
       reject(error);
     }
   });
-}
-
-/**
- * Detect faces in an image using the Python API
- */
-export async function detectFaces(input: FaceDetectionInput) {
-  try {
-    console.log('Detecting faces via Python API...');
-    
-    // Convert input to base64
-    const base64Image = await convertToBase64(input);
-    
-    // Send to API
-    const response = await fetch(`${API_URL}/api/detect-faces`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ image: base64Image }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to detect faces');
-    }
-    
-    const data = await response.json();
-    console.log('Face detection response:', data);
-    
-    if (!data.success) {
-      throw new Error(data.message || 'Face detection failed');
-    }
-    
-    return data.faces;
-  } catch (error) {
-    console.error('Error in API face detection:', error);
-    return [];
-  }
 }
 
 /**
