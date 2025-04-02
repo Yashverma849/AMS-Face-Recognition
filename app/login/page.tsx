@@ -25,6 +25,12 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
   const { signIn } = useAuth()
+  
+  // Debug logging for environment variables
+  console.log("Supabase URL available:", !!SUPABASE_URL);
+  console.log("Supabase key length:", SUPABASE_ANON_KEY?.length || 0);
+  console.log("Auth redirect URL:", AUTH_REDIRECT_URL);
+  
   const supabase = createClientComponentClient({
     supabaseUrl: SUPABASE_URL,
     supabaseKey: SUPABASE_ANON_KEY,

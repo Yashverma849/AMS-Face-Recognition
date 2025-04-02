@@ -35,10 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  
+  // Debug environment variables
+  console.log("Auth Context - Supabase URL available:", !!SUPABASE_URL);
+  console.log("Auth Context - Supabase key length:", SUPABASE_ANON_KEY?.length || 0);
+  console.log("Auth Context - Redirect URL:", AUTH_REDIRECT_URL);
+  
+  // Initialize Supabase client with explicit config
   const supabase = createClientComponentClient({
     supabaseUrl: SUPABASE_URL,
     supabaseKey: SUPABASE_ANON_KEY,
   })
+
+  // Debug the client
+  console.log("Supabase client initialized:", !!supabase);
 
   useEffect(() => {
     // Get initial session
