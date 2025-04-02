@@ -140,7 +140,25 @@ async def root():
     return {"message": "Face Recognition API is running"}
 
 
+@app.get("/health")
+async def health():
+    """Health check endpoint."""
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "face_recognition_loaded": face_recognition is not None,
+        "known_faces_count": len(known_face_encodings)
+    }
+
+
 @app.post("/api/detect-faces", response_model=FaceDetectionResponse)
+async def detect_faces_legacy(request: FaceDetectionRequest):
+    """Legacy endpoint for detecting faces in an image."""
+    return await detect_faces(request)
+
+
+@app.post("/detect-faces", response_model=FaceDetectionResponse)
 async def detect_faces(request: FaceDetectionRequest):
     """Detect faces in an image."""
     try:
@@ -186,14 +204,37 @@ async def detect_faces(request: FaceDetectionRequest):
 
 
 @app.post("/api/register-student")
-async def register_student(request: RegisterStudentRequest, background_tasks: BackgroundTasks):
+async def register_student_legacy(request: RegisterStudentRequest, background_tasks: BackgroundTasks):
+    """Legacy endpoint for registering a student with face data."""
+    return await register_student(request, background_tasks)
+
+
+@app.post("/register-face")
+async def register_student(request: RegisterStudentRequest = None, background_tasks: BackgroundTasks = None,
+                          image: UploadFile = File(...), student_id: str = Form(...), name: str = Form(...)):
     """Register a new student with face data."""
     try:
-        # Decode base64 image
-        image = decode_base64_image(request.image)
+        # If using JSON request
+        if request:
+            # Decode base64 image
+            image_data = decode_base64_image(request.image)
+            student_id = request.studentData.id
+            student_name = f"{request.studentData.first_name} {request.studentData.last_name}"
+            student_data = request.studentData.dict()
+        else:
+            # For multipart form data
+            contents = await image.read()
+            nparr = np.frombuffer(contents, np.uint8)
+            image_data = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            student_name = name
+            student_data = {
+                "id": student_id,
+                "name": name,
+                "registration_date": datetime.now().isoformat()
+            }
         
         # Detect face in the image
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        rgb_image = cv2.cvtColor(image_data, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(rgb_image)
         
         if not face_locations:
@@ -212,12 +253,10 @@ async def register_student(request: RegisterStudentRequest, background_tasks: Ba
         face_encoding = face_recognition.face_encodings(rgb_image, face_locations)[0]
         
         # Create directory for student data
-        student_id = request.studentData.id
         student_dir = os.path.join(FACES_DIR, student_id)
         os.makedirs(student_dir, exist_ok=True)
         
         # Save metadata
-        student_data = request.studentData.dict()
         with open(os.path.join(student_dir, "metadata.json"), "w") as f:
             json.dump(student_data, f)
         
@@ -225,10 +264,14 @@ async def register_student(request: RegisterStudentRequest, background_tasks: Ba
         np.save(os.path.join(student_dir, "encoding.npy"), face_encoding)
         
         # Save face image
-        cv2.imwrite(os.path.join(student_dir, "face.jpg"), image)
+        cv2.imwrite(os.path.join(student_dir, "face.jpg"), image_data)
         
         # Refresh known faces cache in background
-        background_tasks.add_task(load_known_faces)
+        if background_tasks:
+            background_tasks.add_task(load_known_faces)
+        else:
+            # If no background tasks available, reload directly
+            load_known_faces()
         
         return {
             "success": True,
@@ -244,87 +287,107 @@ async def register_student(request: RegisterStudentRequest, background_tasks: Ba
 
 
 @app.post("/api/take-attendance")
-async def take_attendance(request: AttendanceSessionRequest):
+async def take_attendance_legacy(request: AttendanceSessionRequest):
+    """Legacy endpoint for taking attendance."""
+    return await take_attendance(request)
+
+
+@app.post("/recognize-faces")
+async def take_attendance(request: AttendanceSessionRequest = None, 
+                         image: UploadFile = File(None)):
     """Take attendance by recognizing faces in an image."""
     try:
         # Load known faces if needed
         load_known_faces()
         
-        if not known_face_encodings:
+        if len(known_face_encodings) == 0:
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "message": "No registered students found"}
+                content={"success": False, "message": "No registered faces found. Please register students first."}
             )
         
-        # Decode base64 image
-        image = decode_base64_image(request.image)
-        
-        # Convert to RGB for face_recognition library
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        
+        # Get image based on request type
+        if request and request.image:
+            # JSON request with base64 image
+            image_data = decode_base64_image(request.image)
+            session_data = request.sessionData
+        elif image:
+            # Multipart form data
+            contents = await image.read()
+            nparr = np.frombuffer(contents, np.uint8)
+            image_data = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            session_data = {"type": "default", "timestamp": datetime.now().isoformat()}
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "No image provided"}
+            )
+            
         # Detect faces
+        rgb_image = cv2.cvtColor(image_data, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(rgb_image)
-        face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
         
         if not face_locations:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "No faces detected in the image"}
-            )
+            return {
+                "success": False,
+                "message": "No faces detected in the image",
+                "recognized": []
+            }
         
-        # Session info
-        session_data = request.sessionData
-        session_id = session_data.get("id", datetime.now().strftime("%Y%m%d_%H%M%S"))
-        session_name = session_data.get("name", "Unnamed Session")
-        timestamp = datetime.now().isoformat()
+        # Get face encodings
+        face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
         
-        # Recognize faces and take attendance
+        # Compare with known faces
         recognized_students = []
         
-        for face_encoding in face_encodings:
-            # Compare with known faces
+        for i, (face_location, face_encoding) in enumerate(zip(face_locations, face_encodings)):
+            # Compare face with all known faces
+            matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.6)
             face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+            
             best_match_index = np.argmin(face_distances)
             
-            # Check if match is good enough (lower distance = better match)
-            if face_distances[best_match_index] < 0.6:  # Threshold for good match
-                student = known_face_names[best_match_index]
-                confidence = (1 - face_distances[best_match_index]) * 100
-                
+            if matches[best_match_index]:
+                student = known_face_names[best_match_index].copy()
+                student["confidence"] = float(1 - face_distances[best_match_index])
+                student["face_location"] = face_location
+                recognized_students.append(student)
+            else:
+                # Unknown face
+                top, right, bottom, left = face_location
                 recognized_students.append({
-                    "id": student["id"],
-                    "name": student["name"],
-                    "confidence": confidence
+                    "id": f"unknown_{i+1}",
+                    "name": "Unknown",
+                    "confidence": 0.0,
+                    "face_location": face_location
                 })
         
-        # Save attendance record if any students were recognized
-        if recognized_students:
-            attendance_record = {
-                "session_id": session_id,
-                "session_name": session_name,
-                "timestamp": timestamp,
-                "recognized_students": recognized_students
-            }
-            
-            # Create attendance record directory
-            os.makedirs(ATTENDANCE_DIR, exist_ok=True)
-            
-            # Save attendance record
-            attendance_file = os.path.join(ATTENDANCE_DIR, f"{session_id}.json")
-            with open(attendance_file, "w") as f:
-                json.dump(attendance_record, f)
+        # Record attendance if needed
+        attendance_record = {
+            "session": session_data,
+            "timestamp": datetime.now().isoformat(),
+            "recognized_students": [s["id"] for s in recognized_students if "unknown_" not in s["id"]],
+            "unknown_count": sum(1 for s in recognized_students if "unknown_" in s["id"])
+        }
+        
+        # Save attendance record
+        session_id = session_data.get("id", datetime.now().strftime("%Y%m%d_%H%M%S"))
+        attendance_path = os.path.join(ATTENDANCE_DIR, f"{session_id}.json")
+        with open(attendance_path, "w") as f:
+            json.dump(attendance_record, f)
         
         return {
             "success": True,
-            "recognizedStudents": recognized_students,
-            "message": f"Recognized {len(recognized_students)} students"
+            "message": f"Recognized {len([s for s in recognized_students if 'unknown_' not in s['id']])} students",
+            "recognized": recognized_students,
+            "session_id": session_id
         }
         
     except Exception as e:
-        print(f"Error taking attendance: {e}")
+        print(f"Error in face recognition: {e}")
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": f"Error taking attendance: {str(e)}"}
+            content={"success": False, "message": f"Error in face recognition: {str(e)}", "recognized": []}
         )
 
 
