@@ -147,15 +147,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // Use the configured redirect URL
-      console.log("Using redirect URL for signup:", AUTH_REDIRECT_URL);
-
+      // Note: Do NOT set emailRedirectTo for OAuth flows, let Supabase dashboard settings handle it
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: AUTH_REDIRECT_URL,
-        }
       });
 
       if (error) {

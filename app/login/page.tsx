@@ -12,7 +12,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useForm } from "react-hook-form"
 import { FaGoogle } from "react-icons/fa"
 import { Label } from "@/components/ui/label"
-import { AUTH_REDIRECT_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config"
+import { AUTH_REDIRECT_URL, SUPABASE_URL, SUPABASE_ANON_KEY, APP_URL } from "@/lib/config"
 
 type FormData = {
   email: string
@@ -81,19 +81,21 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     console.log("Starting Google sign-in process");
-    console.log("Auth redirect URL exact value:", AUTH_REDIRECT_URL);
     setGoogleLoading(true);
     setErrorMessage("");
 
     try {
-      // Ensure URL is properly formatted with no spaces
-      const redirectUrl = AUTH_REDIRECT_URL.trim();
-      console.log("Using redirect URL for Google auth:", redirectUrl);
+      // Use the Supabase OAuth callback URL directly - this is important!
+      // The Google OAuth flow needs to go through Supabase first, not directly to our app
+      const supabaseCallbackUrl = `https://rajdykbhqzagupzdfqix.supabase.co/auth/v1/callback`;
+      
+      console.log("Using Supabase callback URL for Google auth:", supabaseCallbackUrl);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: redirectUrl,
+          // Do NOT set redirectTo for OAuth - let Supabase handle it
+          // The redirectTo is handled in the Supabase Dashboard settings
           queryParams: {
             // Pass additional parameters to ensure proper redirect
             access_type: 'offline',
