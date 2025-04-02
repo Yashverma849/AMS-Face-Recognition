@@ -1,11 +1,10 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { supabase } from './supabase'
 import { Session, User } from '@supabase/supabase-js'
 import React from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 // Auth context type
 type AuthContextType = {
@@ -34,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     // Get initial session
@@ -45,15 +46,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("Auth state changed:", _event, session?.user?.email);
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+      
+      // Let the middleware handle redirects
+      if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
+        router.refresh();
+      }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [router, supabase])
 
   // Sign in with email and password
   async function signIn(email: string, password: string) {
@@ -82,6 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
       })
 
       if (error) {
@@ -100,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign out
   async function signOut() {
     await supabase.auth.signOut()
+    router.refresh()
   }
 
   const value = {
@@ -118,50 +129,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-// Redirect if not authenticated
+// Redirect if not authenticated - this is now handled by middleware
 export function withAuth<P extends object>(Component: React.ComponentType<P>) {
   return function AuthenticatedComponent(props: P) {
     const { user, loading } = useAuth()
-    const router = useRouter()
-
-    useEffect(() => {
-      const checkUser = async () => {
-        const supabase = createClient()
-        
-        try {
-          // Get current session
-          const { data: { session }, error } = await supabase.auth.getSession()
-          
-          if (error) throw error
-          
-          if (!session) {
-            // Change this to redirect to home page
-            router.push('/')
-            return
-          }
-          
-          // If authenticated, render the component
-          return <Component {...props as P} user={session.user} />
-        } catch (error) {
-          console.error('Authentication error:', error)
-          // Also change this to redirect to home page
-          router.push('/')
-        }
-      }
-      
-      checkUser()
-    }, [router])
 
     if (loading) {
-      return <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      )
     }
     
-    if (!user) {
-      return null // Let the useEffect redirect
-    }
-
+    // The middleware will handle redirects, so we can just render the component
     return <Component {...props as P} user={user} />
   }
 } 

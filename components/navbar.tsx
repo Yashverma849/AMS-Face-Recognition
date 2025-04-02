@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Menu, X, LogOut } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -19,11 +19,11 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      const supabase = createClient()
+      const supabase = createClientComponentClient()
       await supabase.auth.signOut()
       
-      // Force navigation to home page using window.location
-      window.location.href = '/';
+      // Let the middleware handle the redirect
+      router.refresh()
     } catch (error) {
       console.error('Error logging out:', error)
     }
