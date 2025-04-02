@@ -27,12 +27,14 @@ export default function LoginPage() {
   const { signIn } = useAuth()
   
   // Debug logging for environment variables
-  console.log("Supabase URL available:", !!SUPABASE_URL);
+  console.log("Supabase URL:", SUPABASE_URL);
   console.log("Supabase key length:", SUPABASE_ANON_KEY?.length || 0);
+  console.log("Supabase key first 10 chars:", SUPABASE_ANON_KEY?.substring(0, 10) || 'none');
   console.log("Auth redirect URL:", AUTH_REDIRECT_URL);
   
+  // Initialize Supabase client directly with raw values for testing
   const supabase = createClientComponentClient({
-    supabaseUrl: SUPABASE_URL,
+    supabaseUrl: "https://rajdykbhqzagupzdfqix.supabase.co",
     supabaseKey: SUPABASE_ANON_KEY,
   })
 
@@ -47,19 +49,33 @@ export default function LoginPage() {
     setErrorMessage("")
 
     try {
-      const result = await signIn(data.email, data.password)
+      console.log("Logging in with:", data.email);
+      console.log("Using direct Supabase client");
       
-      if (!result.success) {
-        setErrorMessage(result.message || "Invalid email or password")
+      // Try direct Supabase auth instead of context
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      })
+
+      if (error) {
+        console.error("Login error:", error);
+        console.error("Error code:", error.code);
+        console.error("Error status:", error.status);
+        setErrorMessage(error.message);
+      } else if (authData?.session) {
+        console.log("Login successful, redirecting");
+        router.push("/dashboard");
+        router.refresh();
       } else {
-        router.push("/dashboard")
-        router.refresh()
+        console.error("No session returned");
+        setErrorMessage("Authentication failed. Please try again.");
       }
     } catch (error) {
-      console.error("Unexpected login error:", error)
-      setErrorMessage("An unexpected error occurred. Please try again.")
+      console.error("Unexpected login error:", error);
+      setErrorMessage("An unexpected error occurred. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
