@@ -5,6 +5,9 @@ import * as blazeface from '@tensorflow-models/blazeface';
 import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 import { supabase } from './supabase';
 
+// Type for input elements that can be used for face detection
+export type FaceDetectionInput = HTMLImageElement | HTMLVideoElement | HTMLCanvasElement;
+
 // Load models
 let blazeFaceModel: blazeface.BlazeFaceModel | null = null;
 let faceLandmarksModel: any = null;
@@ -14,21 +17,71 @@ let faceLandmarksModel: any = null;
  */
 export async function initFaceDetection() {
   try {
-    // Load models if not already loaded
-    if (!blazeFaceModel) {
-      await tf.ready();
-      console.log('TensorFlow.js loaded');
-      
-      // Load BlazeFace model for face detection
-      blazeFaceModel = await blazeface.load();
-      console.log('BlazeFace model loaded');
-      
-      // Load face landmarks model
-      faceLandmarksModel = await faceLandmarksDetection.load(
-        faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
-        { maxFaces: 1 }
-      );
-      console.log('Face landmarks model loaded');
+    // Check if models are already loaded
+    if (blazeFaceModel && faceLandmarksModel) {
+      console.log('Face detection models already loaded');
+      return true;
+    }
+    
+    // Set up loading indicator
+    console.log('Loading TensorFlow.js and face detection models...');
+    
+    // Ensure TensorFlow is ready
+    await tf.ready();
+    console.log('✓ TensorFlow.js ready');
+    
+    // Load BlazeFace model for face detection with retry
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (!blazeFaceModel && retries < maxRetries) {
+      try {
+        blazeFaceModel = await blazeface.load();
+        console.log('✓ BlazeFace model loaded successfully');
+      } catch (error) {
+        retries++;
+        console.error(`Failed to load BlazeFace model (attempt ${retries}/${maxRetries}):`, error);
+        
+        if (retries >= maxRetries) {
+          throw new Error('Failed to load face detection model after multiple attempts');
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // Load face landmarks model with retry
+    retries = 0;
+    while (!faceLandmarksModel && retries < maxRetries) {
+      try {
+        // Use a compatible method to load the face landmarks model
+        faceLandmarksModel = await faceLandmarksDetection.createDetector(
+          faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+          {
+            runtime: 'mediapipe',
+            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
+            maxFaces: 1,
+            refineLandmarks: true
+          }
+        );
+        console.log('✓ Face landmarks model loaded successfully');
+      } catch (error) {
+        retries++;
+        console.error(`Failed to load face landmarks model (attempt ${retries}/${maxRetries}):`, error);
+        
+        if (retries >= maxRetries) {
+          throw new Error('Failed to load face landmarks model after multiple attempts');
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // Verify models are loaded
+    if (!blazeFaceModel || !faceLandmarksModel) {
+      throw new Error('Face detection models failed to load properly');
     }
     
     return true;
@@ -39,16 +92,70 @@ export async function initFaceDetection() {
 }
 
 /**
+ * Convert canvas element to an image or video compatible format for face detection
+ */
+function prepareInputForFaceDetection(input: FaceDetectionInput): HTMLImageElement | HTMLVideoElement {
+  // If input is already an image or video, return it directly
+  if (input instanceof HTMLImageElement || input instanceof HTMLVideoElement) {
+    return input;
+  }
+  
+  // If input is a canvas, we need to create a temporary image from it
+  if (input instanceof HTMLCanvasElement) {
+    // Create a new image element
+    const img = new Image();
+    // Set crossOrigin to anonymous to avoid CORS issues with the canvas data
+    img.crossOrigin = "anonymous";
+    // Convert canvas to a data URL and set it as the image source
+    img.src = input.toDataURL('image/png');
+    
+    // Check if image is loaded
+    if (!img.complete) {
+      // This is a synchronous operation in this context
+      console.warn('Image from canvas not immediately loaded, may cause issues');
+    }
+    
+    return img;
+  }
+  
+  throw new Error('Unsupported input type for face detection');
+}
+
+/**
  * Detect faces in an image
  */
-export async function detectFaces(image: HTMLImageElement | HTMLVideoElement) {
+export async function detectFaces(input: FaceDetectionInput) {
+  // Ensure model is loaded
   if (!blazeFaceModel) {
-    await initFaceDetection();
+    console.log('BlazeFace model not loaded, attempting to initialize...');
+    const initialized = await initFaceDetection();
+    if (!initialized || !blazeFaceModel) {
+      console.error('Failed to initialize face detection model');
+      throw new Error('Face detection model is not available');
+    }
   }
   
   try {
+    // Prepare input for processing
+    const processableInput = prepareInputForFaceDetection(input);
+    
+    // Check if the image is valid and has dimensions
+    if (!processableInput || !processableInput.width || !processableInput.height) {
+      console.error('Invalid image for face detection', { 
+        valid: !!processableInput, 
+        width: processableInput?.width, 
+        height: processableInput?.height 
+      });
+      throw new Error('Invalid image for face detection');
+    }
+    
+    // Check if the model is ready before using it
+    if (!blazeFaceModel) {
+      throw new Error('Face detection model is not available');
+    }
+    
     // Detect faces
-    const predictions = await blazeFaceModel!.estimateFaces(image, false);
+    const predictions = await blazeFaceModel.estimateFaces(processableInput, false);
     return predictions;
   } catch (error) {
     console.error('Error detecting faces:', error);
@@ -60,17 +167,36 @@ export async function detectFaces(image: HTMLImageElement | HTMLVideoElement) {
  * Extract face encoding (feature vector) from a face image
  */
 export async function extractFaceEncoding(
-  image: HTMLImageElement | HTMLVideoElement,
+  input: FaceDetectionInput,
   faceBox?: { topLeft: [number, number], bottomRight: [number, number] }
 ) {
   try {
+    // Ensure model is loaded
     if (!faceLandmarksModel) {
-      await initFaceDetection();
+      console.log('Face landmarks model not loaded, attempting to initialize...');
+      const initialized = await initFaceDetection();
+      if (!initialized || !faceLandmarksModel) {
+        console.error('Failed to initialize face landmarks model');
+        throw new Error('Face landmarks model is not available');
+      }
     }
     
-    // Get face landmarks
-    const predictions = await faceLandmarksModel!.estimateFaces({
-      input: image,
+    // Prepare input for processing
+    const processableInput = prepareInputForFaceDetection(input);
+    
+    // Check if the image is valid and has dimensions
+    if (!processableInput || !processableInput.width || !processableInput.height) {
+      console.error('Invalid image for face encoding', { 
+        valid: !!processableInput, 
+        width: processableInput?.width, 
+        height: processableInput?.height 
+      });
+      throw new Error('Invalid image for face encoding');
+    }
+    
+    // Get face landmarks - note API might differ based on the model version
+    const predictions = await faceLandmarksModel.estimateFaces({
+      input: processableInput,
       returnTensors: false,
       flipHorizontal: false,
       predictIrises: false
@@ -81,7 +207,11 @@ export async function extractFaceEncoding(
     }
     
     // Extract the landmarks as a feature vector
-    const landmarks = predictions[0].scaledMesh;
+    const landmarks = predictions[0].scaledMesh || predictions[0].keypoints;
+    
+    if (!landmarks || landmarks.length === 0) {
+      throw new Error('Failed to extract facial landmarks');
+    }
     
     // Convert landmarks to a normalized feature vector
     const featureVector = normalizeFeatureVector(landmarks);
