@@ -1,143 +1,104 @@
-# Attendance Management System with Face Recognition
+# BPIT Attendance System
 
-This is a Next.js web application with a Python backend for facial recognition-based attendance management.
+A face recognition-based attendance management system for Bhagwan Parshuram Institute of Technology.
 
 ## Features
 
-- Student registration with facial data
-- Automated attendance via face recognition
-- Attendance records and statistics
-- User-friendly web interface
+- User authentication with Supabase
+- Student registration with face encoding
+- Automated attendance using face recognition
+- Dashboard for attendance statistics
+- Secure data storage in Supabase
 
-## Project Structure
+## Tech Stack
 
-The project consists of two main parts:
-
-1. **Next.js Frontend** - Web interface built with Next.js
-2. **Python Backend** - Flask server for face recognition processing
-
-## Requirements
-
-### Frontend
-- Node.js 18+ and npm/pnpm
-- Next.js 13+
-
-### Backend
-- Python 3.8+
-- OpenCV
-- dlib
-- face_recognition library
-- Flask
+- **Frontend**: Next.js, TypeScript, Tailwind CSS
+- **Backend**: Python, Flask
+- **Database**: Supabase (PostgreSQL)
+- **Storage**: Supabase Storage
+- **Authentication**: Supabase Auth
+- **Face Recognition**: OpenCV (Python)
 
 ## Setup Instructions
 
-### Setting up the Frontend
+### Prerequisites
 
-1. Install dependencies:
-```bash
-npm install
-# or
-pnpm install
-```
+- Node.js 18+ and npm
+- Python 3.10+ (recommended for best compatibility)
+- Supabase account
 
-2. Copy the `.env.local.example` file to `.env.local` if it doesn't exist already:
-```bash
-cp .env.local.example .env.local
-```
+### Supabase Setup
 
-3. Run the development server:
-```bash
-npm run dev
-# or
-pnpm dev
-```
+1. Create a new Supabase project
+2. Run the SQL in `database_schema.sql` in the Supabase SQL editor
+3. Create two storage buckets: `student-images` and `attendance-images`
+4. Set up authentication providers (Email, Google OAuth)
+5. Get your Supabase URL and keys from the Settings → API section
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+### Environment Setup
 
-### Setting up the Python Backend
+1. **Frontend**: Copy `.env.example` to `.env.local` and fill in your Supabase details:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
 
-1. Navigate to the python-server directory:
-```bash
-cd python-server
-```
+2. **Backend**: Copy `python-server/.env.example` to `python-server/.env` and fill in:
+   ```
+   SUPABASE_URL=https://your-project-id.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
 
-2. Run the setup script to create necessary directories and install dependencies:
-```bash
-# On Windows
-python setup.py
+### Installation
 
-# On Linux/macOS
-python3 setup.py
-```
+1. **Frontend**:
+   ```bash
+   npm install
+   npm run dev
+   ```
 
-3. Start the Flask server:
-```bash
-# On Windows
-python app.py
+2. **Backend**:
+   ```bash
+   cd python-server
+   
+   # Option 1: Using pip directly
+   pip install -r requirements.txt
+   
+   # Option 2: Using virtual environment (recommended)
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   
+   # Start the server
+   python app.py
+   ```
 
-# On Linux/macOS
-python3 app.py
-```
+## Deployment
 
-The Python server will run on port 5000.
+### Frontend (Vercel)
 
-## Using the Application
+1. Push your code to GitHub
+2. Connect your repository to Vercel
+3. Add your environment variables in Vercel
+4. Deploy
 
-### 1. Register Students
-- Go to the "Register Student" page
-- Fill in the student details
-- Capture the student's facial data using the webcam
-- Submit the form to register the student
+### Backend (Render, Heroku, etc.)
 
-### 2. Take Attendance
-- Go to the "Take Attendance" page
-- Fill in the session details
-- Click "Start Scanning" and position the camera to capture all students
-- The system will recognize faces and mark attendance
-- Review and save the attendance results
+1. Choose a Python hosting service
+2. Set up environment variables
+3. Deploy the `python-server` directory
+4. Update your frontend's `NEXT_PUBLIC_PYTHON_API_URL` to point to your deployed API
 
-### 3. View Attendance Records
-- Go to the "View Attendance" page
-- Browse attendance records by session or by student
-- Filter and export attendance data as needed
+## Security Notes
 
-## Integration Overview
-
-### How it works:
-
-1. The Next.js frontend provides the user interface for registration, attendance, and viewing records.
-2. When a student is registered, their facial data is sent to the Python backend for processing.
-3. The Python backend uses the `face_recognition` library to extract facial features and stores them.
-4. For attendance, camera feed is sent to the Python backend, where faces are recognized against stored encodings.
-5. Recognition results are sent back to the frontend and displayed to the user.
-
-## Common Issues & Troubleshooting
-
-### dlib Installation Issues
-- On Windows, installing dlib can be tricky. Follow these steps:
-  1. Install Visual Studio with C++ build tools
-  2. Use a pre-built wheel: `pip install https://github.com/jloh02/dlib/releases/download/v19.22/dlib-19.22.99-cp310-cp310-win_amd64.whl` (adjust for your Python version)
-
-### Camera Access Issues
-- Make sure your browser has permission to access the camera
-- Try using Chrome or Edge if you're having issues with other browsers
-
-### Face Recognition Accuracy
-- Ensure good lighting when capturing facial data
-- Position faces directly towards the camera for best results
-- If recognition is poor, try adjusting the confidence threshold in `.env.local`
-
-## Configuration
-
-You can modify the following settings:
-
-- In `.env.local`: Configure API endpoints and face recognition parameters
-- In `python-server/app.py`: Adjust face recognition parameters
-
-## Based on
-
-This project is a web adaptation of [Attendance Management System With Face Recognition](https://github.com/Yashverma849/Attendance-Management-System-With-Face-Recognition.git) by Yash Verma.
+- **NEVER** commit environment files (.env) with real credentials
+- **NEVER** use the service role key in frontend code
+- Ensure proper authentication for all API endpoints
 
 ## License
 
-MIT 
+[MIT License](LICENSE)
+
+## Contributors
+
+- [Your Name](https://github.com/yourusername) 

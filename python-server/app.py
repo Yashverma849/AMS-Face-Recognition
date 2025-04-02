@@ -13,9 +13,12 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Print Supabase URL to verify it's loaded correctly
-print(f"Supabase URL: {os.environ.get('SUPABASE_URL')}")
-print(f"Supabase key length: {len(os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')) if os.environ.get('SUPABASE_SERVICE_ROLE_KEY') else 0}")
+# Check and print environment status
+print(f"Environment Check:")
+print(f"FLASK_APP: {os.environ.get('FLASK_APP')}")
+print(f"FLASK_ENV: {os.environ.get('FLASK_ENV')}")
+print(f"SUPABASE_URL is set: {'Yes' if os.environ.get('SUPABASE_URL') else 'No'}")
+print(f"SUPABASE_SERVICE_ROLE_KEY is set: {'Yes' if os.environ.get('SUPABASE_SERVICE_ROLE_KEY') else 'No'}")
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -30,7 +33,12 @@ os.makedirs(STUDENT_IMAGES_FOLDER, exist_ok=True)
 os.makedirs(ATTENDANCE_FOLDER, exist_ok=True)
 
 # Face detection cascade classifier
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+try:
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    print("Face cascade classifier loaded successfully")
+except Exception as e:
+    print(f"Error loading face cascade classifier: {str(e)}")
+    traceback.print_exc()
 
 # Function to process base64 image and save
 def process_base64_image(base64_string, save_path):

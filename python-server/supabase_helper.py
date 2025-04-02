@@ -4,20 +4,21 @@ import base64
 import numpy as np
 from supabase import create_client, Client
 import io
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Initialize Supabase client
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
-print(f"DEBUG - Supabase URL: {supabase_url}")
-print(f"DEBUG - Supabase key set: {'Yes' if supabase_key else 'No'}")
+print(f"DEBUG - Supabase URL is set: {'Yes' if supabase_url else 'No'}")
+print(f"DEBUG - Supabase key is set: {'Yes' if supabase_key else 'No'}")
 
 # Check if the environment variables are loaded
 if not supabase_url or not supabase_key:
-    # Hardcode credentials as fallback for development
-    supabase_url = "https://rajdykbhqzagupzdfqix.supabase.co"
-    supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhamR5a2JocXphZ3VwemRmcWl4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MzUxMzk0MSwiZXhwIjoyMDU5MDg5OTQxfQ.EdOehKJHc9l1do8mIjMADARkdy5CD3-LlYCa0BJX6oI"
-    print("Using hardcoded credentials as fallback")
+    raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment variables")
 
 # Now create the client
 supabase: Client = create_client(supabase_url, supabase_key)
