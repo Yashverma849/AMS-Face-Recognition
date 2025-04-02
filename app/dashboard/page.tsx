@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { UserPlus, Users, Clock, PlusCircle } from 'lucide-react'
+import { UserPlus, Users, Clock, PlusCircle, GraduationCap } from 'lucide-react'
 import DashboardLayout from '@/components/dashboard-layout'
 
 interface DashboardPageProps {
@@ -30,13 +30,32 @@ interface Student {
   created_at: string
 }
 
-// Updated dashboard to handle empty data - [current date]
+// Function to get teacher name from user data
+function getTeacherName(user: User): string {
+  // Try to get name from user metadata
+  const fullName = user.user_metadata?.full_name || user.user_metadata?.name;
+  
+  if (fullName) {
+    return fullName;
+  }
+  
+  // If no name in metadata, use email username as fallback
+  if (user.email) {
+    const username = user.email.split('@')[0];
+    // Convert username to proper case (capitalize first letter, lowercase rest)
+    return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
+  }
+  
+  // Default fallback
+  return "Teacher";
+}
 
 function DashboardPage({ user }: DashboardPageProps) {
   const [sessions, setSessions] = useState<AttendanceSession[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const teacherName = getTeacherName(user)
   
   useEffect(() => {
     async function fetchData() {
@@ -135,10 +154,11 @@ function DashboardPage({ user }: DashboardPageProps) {
           
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">User</CardTitle>
+              <CardTitle className="text-sm font-medium">Teacher</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-md font-medium truncate">{user.email}</div>
+            <CardContent className="flex items-center">
+              <GraduationCap className="h-5 w-5 mr-2 text-emerald-600" />
+              <div className="text-md font-medium truncate">{teacherName}</div>
             </CardContent>
           </Card>
         </div>
