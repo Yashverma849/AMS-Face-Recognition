@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Alert, AlertDescription } from './ui/alert'
-import { detectFaces } from '@/lib/face-recognition-api'
+import { detectFaces, testApiConnection, API_URL, convertToBase64 } from '@/lib/face-recognition-api'
 
 interface FaceCaptureProps {
   onCapture: (imageData: HTMLCanvasElement) => void
@@ -27,6 +27,7 @@ export default function FaceCapture({
   const [isCaptureReady, setCaptureReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [faceDetected, setFaceDetected] = useState(false)
+  const [apiStatus, setApiStatus] = useState<boolean | null>(null)
   
   // Start camera
   const startCamera = async () => {
@@ -67,34 +68,48 @@ export default function FaceCapture({
   
   // Detect face in video stream
   const detectFaceInVideo = async () => {
-    if (!videoRef.current || !isCameraActive) return
+    if (!videoRef.current || !isCameraActive || !apiStatus) return
     
     try {
       console.log("Attempting to detect face in video stream...");
-      const faces = await detectFaces(videoRef.current)
       
-      // Log detection results
-      console.log(`Face detection results: ${faces.length} faces found`);
+      // Convert video frame to base64
+      if (!canvasRef.current) return;
+      const context = canvasRef.current.getContext('2d');
+      if (!context) return;
+      
+      // Set canvas dimensions to match video
+      canvasRef.current.width = videoRef.current.videoWidth;
+      canvasRef.current.height = videoRef.current.videoHeight;
+      
+      // Draw the current video frame
+      context.drawImage(videoRef.current, 0, 0);
+      const imageBase64 = canvasRef.current.toDataURL('image/jpeg', 0.9);
+      
+      // Send to API
+      const result = await detectFaces(imageBase64);
+      
+      console.log(`Face detection results:`, result);
       
       // Check if we have valid faces
-      const hasFaces = Array.isArray(faces) && faces.length > 0;
-      setFaceDetected(hasFaces)
-      setCaptureReady(hasFaces) // Only ready when at least one face is detected
+      const hasFaces = result.success && Array.isArray(result.data) && result.data.length > 0;
+      setFaceDetected(hasFaces);
+      setCaptureReady(hasFaces); // Only ready when at least one face is detected
       
       // Continue detecting faces
       if (isCameraActive) {
-        requestAnimationFrame(detectFaceInVideo)
+        setTimeout(() => requestAnimationFrame(detectFaceInVideo), 500); // Reduced frequency for API calls
       }
     } catch (err) {
-      console.error('Face detection error:', err)
-      setError('Face detection failed. Please reload the page and try again.')
+      console.error('Face detection error:', err);
+      setError('Face detection failed. Please reload the page and try again.');
       
       // Retry detection after a delay
       setTimeout(() => {
         if (isCameraActive) {
-          detectFaceInVideo()
+          detectFaceInVideo();
         }
-      }, 3000)
+      }, 3000);
     }
   }
   
@@ -117,8 +132,24 @@ export default function FaceCapture({
     stopCamera()
   }
   
+  // Check API status
+  const checkApiStatus = async () => {
+    try {
+      const result = await testApiConnection();
+      console.log('Face API connection test:', result);
+      setApiStatus(result.success);
+      return result.success;
+    } catch (error) {
+      console.error('Face API is not available:', error);
+      setApiStatus(false);
+      return false;
+    }
+  };
+  
   // Cleanup on unmount
   useEffect(() => {
+    checkApiStatus();
+    
     return () => {
       stopCamera()
     }
@@ -129,6 +160,14 @@ export default function FaceCapture({
       {error && (
         <Alert className="mb-4 bg-red-50 text-red-900 border-red-200">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      {apiStatus === false && (
+        <Alert className="mb-4 bg-red-50 text-red-900 border-red-200">
+          <AlertDescription>
+            Face detection model is not available. Please check that the API is running at {API_URL}
+          </AlertDescription>
         </Alert>
       )}
       
@@ -170,7 +209,7 @@ export default function FaceCapture({
       
       <div className="space-x-4">
         {!isCameraActive ? (
-          <Button onClick={startCamera}>Start Camera</Button>
+          <Button onClick={startCamera} disabled={apiStatus === false}>Start Camera</Button>
         ) : (
           <>
             <Button onClick={stopCamera} variant="outline">Stop Camera</Button>
