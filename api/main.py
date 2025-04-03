@@ -396,6 +396,17 @@ async def take_attendance(request: AttendanceSessionRequest = None,
         )
 
 
+@app.get("/test-connection")
+async def test_connection():
+    """Simple endpoint to test API connectivity."""
+    return {
+        "status": "success",
+        "message": "Connection to Face Recognition API successful!",
+        "timestamp": datetime.now().isoformat(),
+        "cors": "Configured for Vercel domains"
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
