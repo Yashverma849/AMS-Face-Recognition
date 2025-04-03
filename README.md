@@ -1,14 +1,48 @@
 # BPIT Attendance System
 
-A face recognition-based attendance management system for Bhagwan Parshuram Institute of Technology.
+A face recognition-based attendance system for BPIT. This application allows instructors to register students and take attendance using facial recognition technology.
 
 ## Features
 
-- User authentication with Supabase
-- Student registration with face encoding
-- Automated attendance using face recognition
-- Dashboard for attendance statistics
-- Secure data storage in Supabase
+- Web-based interface for easy access
+- Face recognition for student identification
+- Registration of new students with facial data
+- Taking attendance by recognizing faces
+- Viewing attendance records
+
+## System Architecture
+
+The system consists of two main components:
+
+1. **Frontend**: Next.js web application for user interface
+2. **Backend**: Python-based face recognition API running on Render.com
+
+## Development
+
+### Prerequisites
+
+- Node.js (v16+)
+- npm or yarn
+- Python 3.8+ (for backend API)
+
+### Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Create a `.env.local` file with the required environment variables
+4. Start the development server: `npm run dev`
+
+### Environment Variables
+
+- `NEXT_PUBLIC_SUPABASE_URL`: URL for Supabase instance
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Anon key for Supabase
+- `NEXT_PUBLIC_FACE_API_URL`: URL for the face recognition API
+
+## Deployment
+
+The frontend is deployed on Vercel and the face recognition API is deployed on Render.com.
+
+Last updated: April 3, 2025
 
 ## Tech Stack
 
