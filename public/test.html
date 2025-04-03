@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face API Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #videoContainer, #imagePreviewContainer {
+            width: 100%;
+            text-align: center;
+        }
+        #videoElement, #imagePreview {
+            max-width: 100%;
+            max-height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #canvasElement {
+            display: none;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            color: #f44336;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #4CAF50;
+            padding: 10px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Face Recognition API Test</h1>
+    
+    <div class="container">
+        <div class="card">
+            <h2>1. API Connection Test</h2>
+            <p>Test the connection to the Face Recognition API at:</p>
+            <input type="text" id="apiUrl" value="https://bpit-face-api.onrender.com" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+            <button id="testConnectionBtn">Test Connection</button>
+            <div id="connectionResult"></div>
+        </div>
+
+        <div class="card">
+            <h2>2. Camera Test</h2>
+            <p>Capture from your camera to test face detection:</p>
+            <div id="videoContainer">
+                <video id="videoElement" autoplay playsinline></video>
+            </div>
+            <button id="startCameraBtn">Start Camera</button>
+            <button id="captureBtn" disabled>Capture Image</button>
+            <button id="stopCameraBtn" disabled>Stop Camera</button>
+        </div>
+
+        <div class="card">
+            <h2>3. Face Detection Test</h2>
+            <p>Captured image for face detection:</p>
+            <div id="imagePreviewContainer">
+                <img id="imagePreview" style="display: none;">
+                <canvas id="canvasElement"></canvas>
+            </div>
+            <button id="detectFacesBtn" disabled>Detect Faces</button>
+            <div id="detectionResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const apiUrlInput = document.getElementById('apiUrl');
+        const testConnectionBtn = document.getElementById('testConnectionBtn');
+        const connectionResult = document.getElementById('connectionResult');
+        
+        const videoElement = document.getElementById('videoElement');
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const stopCameraBtn = document.getElementById('stopCameraBtn');
+        
+        const imagePreview = document.getElementById('imagePreview');
+        const canvasElement = document.getElementById('canvasElement');
+        const detectFacesBtn = document.getElementById('detectFacesBtn');
+        const detectionResult = document.getElementById('detectionResult');
+        
+        let stream = null;
+        
+        // Test API Connection
+        testConnectionBtn.addEventListener('click', async () => {
+            const apiUrl = apiUrlInput.value.trim();
+            connectionResult.innerHTML = '<p>Testing connection...</p>';
+            
+            try {
+                const response = await fetch(`${apiUrl}/test-connection`);
+                if (response.ok) {
+                    const data = await response.json();
+                    connectionResult.innerHTML = `
+                        <div class="success">
+                            <p>✅ Connection successful!</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    connectionResult.innerHTML = `
+                        <div class="error">
+                            <p>❌ Connection failed: HTTP ${response.status}</p>
+                            <p>${await response.text()}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                connectionResult.innerHTML = `
+                    <div class="error">
+                        <p>❌ Connection error:</p>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+        
+        // Camera Handling
+        startCameraBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    } 
+                });
+                videoElement.srcObject = stream;
+                startCameraBtn.disabled = true;
+                captureBtn.disabled = false;
+                stopCameraBtn.disabled = false;
+            } catch (error) {
+                alert(`Camera error: ${error.message}`);
+            }
+        });
+        
+        stopCameraBtn.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                startCameraBtn.disabled = false;
+                captureBtn.disabled = true;
+                stopCameraBtn.disabled = true;
+            }
+        });
+        
+        captureBtn.addEventListener('click', () => {
+            if (videoElement.srcObject) {
+                const context = canvasElement.getContext('2d');
+                // Set canvas dimensions to match video
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                // Draw video frame to canvas
+                context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+                // Convert canvas to image
+                imagePreview.src = canvasElement.toDataURL('image/jpeg', 0.9);
+                imagePreview.style.display = 'block';
+                detectFacesBtn.disabled = false;
+            }
+        });
+        
+        // Face Detection
+        detectFacesBtn.addEventListener('click', async () => {
+            const apiUrl = apiUrlInput.value.trim();
+            detectionResult.innerHTML = '<p>Detecting faces...</p>';
+            
+            try {
+                // Get base64 image data without the prefix
+                const imageData = imagePreview.src;
+                
+                // Send to API
+                const response = await fetch(`${apiUrl}/detect-faces`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Draw detected faces on the image
+                        const context = canvasElement.getContext('2d');
+                        // Clear previous drawings
+                        context.drawImage(imagePreview, 0, 0, canvasElement.width, canvasElement.height);
+                        
+                        // Draw rectangles around detected faces
+                        context.strokeStyle = '#00FF00';
+                        context.lineWidth = 2;
+                        
+                        let facesFound = 0;
+                        if (data.faces && Array.isArray(data.faces)) {
+                            facesFound = data.faces.length;
+                            data.faces.forEach(face => {
+                                if (face.box) {
+                                    const { left, top, right, bottom } = face.box;
+                                    const width = right - left;
+                                    const height = bottom - top;
+                                    context.strokeRect(left, top, width, height);
+                                }
+                            });
+                        }
+                        
+                        // Update image preview with face rectangles
+                        imagePreview.src = canvasElement.toDataURL('image/jpeg', 0.9);
+                        
+                        detectionResult.innerHTML = `
+                            <div class="success">
+                                <p>✅ Detected ${facesFound} faces!</p>
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </div>
+                        `;
+                    } else {
+                        detectionResult.innerHTML = `
+                            <div class="error">
+                                <p>❌ Face detection failed:</p>
+                                <p>${data.message || 'Unknown error'}</p>
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </div>
+                        `;
+                    }
+                } else {
+                    detectionResult.innerHTML = `
+                        <div class="error">
+                            <p>❌ API request failed: HTTP ${response.status}</p>
+                            <p>${await response.text()}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                detectionResult.innerHTML = `
+                    <div class="error">
+                        <p>❌ Detection error:</p>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+
+        // Initial connection test on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            testConnectionBtn.click();
+        });
+    </script>
+</body>
+</html> 
