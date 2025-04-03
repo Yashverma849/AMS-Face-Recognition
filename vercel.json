@@ -1,11 +1,22 @@
 {
-  "buildCommand": "npm run build",
+  "rewrites": [
+    { "source": "/test.html", "destination": "/test.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "buildCommand": "next build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "functions": {
+    "api/*": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "env": {
+    "NEXT_PUBLIC_FACE_API_URL": "https://bpit-face-api.onrender.com"
+  },
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "framework": "nextjs",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
   "headers": [
     {
       "source": "/(.*)",
