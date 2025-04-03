@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import DashboardLayout from '@/components/dashboard-layout'
 import FaceCapture from '@/components/face-capture'
 import { registerStudentWithFace } from '@/lib/face-recognition'
+import { registerStudentFace, testApiConnection } from '@/lib/face-recognition-api'
 import { withAuth } from '@/lib/auth'
 
 function RegisterStudentPage() {
@@ -26,6 +27,22 @@ function RegisterStudentPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [useApiRegistration, setUseApiRegistration] = useState(false)
+
+  // Check if the API is available
+  React.useEffect(() => {
+    const checkApiAvailability = async () => {
+      try {
+        const isApiAvailable = await testApiConnection();
+        setUseApiRegistration(isApiAvailable);
+        console.log('API registration available:', isApiAvailable);
+      } catch (err) {
+        console.error('Error checking API availability:', err);
+      }
+    };
+    
+    checkApiAvailability();
+  }, []);
 
   // Handle face image capture
   const handleCapture = (imageData: HTMLCanvasElement) => {
@@ -63,10 +80,31 @@ function RegisterStudentPage() {
     }
     
     try {
-      // Register student using browser-based face recognition
-      await registerStudentWithFace(studentData, capturedImage)
-      
-      setSuccess('Student registered successfully!')
+      // Try API registration first if available
+      if (useApiRegistration) {
+        console.log('Using API for student registration');
+        try {
+          const result = await registerStudentFace(studentData, capturedImage);
+          if (result.success) {
+            setSuccess('Student registered successfully using API!');
+          } else {
+            // If API registration fails, fall back to client-side registration
+            console.log('API registration failed, falling back to client-side');
+            await registerStudentWithFace(studentData, capturedImage);
+            setSuccess('Student registered successfully using client-side processing!');
+          }
+        } catch (apiError) {
+          console.error('API registration error, falling back to client-side:', apiError);
+          // Fall back to client-side registration
+          await registerStudentWithFace(studentData, capturedImage);
+          setSuccess('Student registered successfully using fallback method!');
+        }
+      } else {
+        // Use browser-based face recognition
+        console.log('Using client-side face recognition for registration');
+        await registerStudentWithFace(studentData, capturedImage);
+        setSuccess('Student registered successfully!');
+      }
       
       // Clear form after success
       setTimeout(() => {
@@ -101,6 +139,11 @@ function RegisterStudentPage() {
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Register New Student</h1>
+          {useApiRegistration && (
+            <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+              Using enhanced API registration
+            </div>
+          )}
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

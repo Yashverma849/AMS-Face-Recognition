@@ -5,6 +5,7 @@ import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Alert, AlertDescription } from './ui/alert'
 import { initFaceDetection, detectFaces } from '@/lib/face-recognition'
+import { detectFacesWithApi, testApiConnection } from '@/lib/face-recognition-api'
 
 interface FaceCaptureProps {
   onCapture: (imageData: HTMLCanvasElement) => void
@@ -27,13 +28,35 @@ export default function FaceCapture({
   const [isCaptureReady, setCaptureReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [faceDetected, setFaceDetected] = useState(false)
+  const [useApiDetection, setUseApiDetection] = useState(false)
+  const [isApiAvailable, setIsApiAvailable] = useState(false)
   
-  // Initialize face detection
+  // Initialize face detection and check API availability
   useEffect(() => {
-    initFaceDetection().catch(err => {
-      console.error('Error initializing face detection:', err)
-      setError('Failed to initialize face detection models')
-    })
+    const setupDetection = async () => {
+      try {
+        // Try to initialize TensorFlow.js models
+        await initFaceDetection().catch(err => {
+          console.error('TensorFlow.js initialization error:', err)
+          // Don't set error yet, we'll try the API
+        })
+        
+        // Check if API is available
+        const apiAvailable = await testApiConnection();
+        setIsApiAvailable(apiAvailable);
+        
+        if (apiAvailable) {
+          console.log('Face API is available, will use as fallback');
+        } else {
+          console.log('Face API is not available, using TensorFlow.js only');
+        }
+      } catch (err) {
+        console.error('Error during detection setup:', err)
+        setError('Failed to initialize face detection. Please refresh the page.')
+      }
+    };
+    
+    setupDetection();
   }, [])
   
   // Start camera
@@ -78,8 +101,32 @@ export default function FaceCapture({
     if (!videoRef.current || !isCameraActive) return
     
     try {
-      console.log("Attempting to detect face in video stream...");
-      const faces = await detectFaces(videoRef.current)
+      let faces;
+      
+      // First try TensorFlow.js detection if we're not set to use API
+      if (!useApiDetection) {
+        try {
+          console.log("Attempting to detect face using TensorFlow.js...");
+          faces = await detectFaces(videoRef.current);
+        } catch (tfError) {
+          console.error('TensorFlow.js detection error, trying API fallback:', tfError);
+          
+          // If TensorFlow.js fails and API is available, switch to API detection
+          if (isApiAvailable) {
+            setUseApiDetection(true);
+            // Retry with API
+            return detectFaceInVideo();
+          } else {
+            throw tfError; // Re-throw if API is not available
+          }
+        }
+      } else if (isApiAvailable) {
+        // Use API detection
+        console.log("Attempting to detect face using API...");
+        faces = await detectFacesWithApi(videoRef.current);
+      } else {
+        throw new Error('No face detection method available');
+      }
       
       // Log detection results
       console.log(`Face detection results: ${faces.length} faces found`, faces);
@@ -194,6 +241,9 @@ export default function FaceCapture({
       </div>
       
       <p className="text-sm text-gray-500">{captureText}</p>
+      {isApiAvailable && (
+        <p className="text-xs text-green-600">API backend available for improved face detection</p>
+      )}
     </div>
   )
 } 
