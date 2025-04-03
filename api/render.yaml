@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: bpit-face-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: false
+    envVars:
+      - key: PORT
+        value: 8000
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1 
