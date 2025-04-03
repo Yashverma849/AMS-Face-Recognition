@@ -1,6 +1,7 @@
 "use client"
 
 import { FaceDetectionInput } from './face-recognition';
+import { ApiResponse } from '@/types/api';
 
 // API client for the Python face recognition backend
 
@@ -22,60 +23,146 @@ export const base64ToBlob = (base64: string, type = 'image/jpeg'): Blob => {
 };
 
 /**
- * Detect faces in the provided image
+ * Test connection to the Face Recognition API
+ * @returns Promise with connection status
  */
-export const detectFaces = async (imageData: string): Promise<any> => {
+export async function testApiConnection(): Promise<ApiResponse> {
   try {
-    console.log("🔍 Detecting faces with API at:", API_URL);
-    
-    const formData = new FormData();
-    const blob = base64ToBlob(imageData);
-    formData.append('image', blob, 'image.jpg');
-    
-    const response = await fetch(`${API_URL}/detect-faces`, {
-      method: 'POST',
-      body: formData,
+    const response = await fetch(`${API_URL}/test-connection`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
-    
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
-    return await response.json();
+
+    const data = await response.json();
+    return {
+      success: true,
+      data,
+      message: data.message || 'Connection successful',
+    };
   } catch (error) {
-    console.error('Error detecting faces:', error);
-    throw error;
+    console.error('Error testing API connection:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to connect to Face Recognition API',
+    };
   }
-};
+}
 
 /**
- * Register a new student face
+ * Detect faces in an image
+ * @param imageBase64 - Base64 encoded image
+ * @returns Promise with detected faces information
  */
-export const registerFace = async (imageData: string, studentId: string, name: string): Promise<any> => {
+export async function detectFaces(imageBase64: string): Promise<ApiResponse> {
   try {
-    console.log(`🔍 Registering face for student ${studentId} with API at:`, API_URL);
-    
-    const formData = new FormData();
-    const blob = base64ToBlob(imageData);
-    formData.append('image', blob, 'image.jpg');
-    formData.append('student_id', studentId);
-    formData.append('name', name);
-    
+    const response = await fetch(`${API_URL}/detect-faces`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ image: imageBase64 }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success,
+      data: data.faces,
+      message: data.message,
+    };
+  } catch (error) {
+    console.error('Error detecting faces:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'An unknown error occurred',
+    };
+  }
+}
+
+/**
+ * Register a student with face data
+ * @param studentData - Student information
+ * @param imageBase64 - Base64 encoded image of student's face
+ * @returns Promise with registration result
+ */
+export async function registerStudent(studentData: any, imageBase64: string): Promise<ApiResponse> {
+  try {
     const response = await fetch(`${API_URL}/register-face`, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        studentData,
+        image: imageBase64,
+      }),
     });
-    
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
-    return await response.json();
+
+    const data = await response.json();
+    return {
+      success: data.success,
+      data,
+      message: data.message,
+    };
   } catch (error) {
-    console.error('Error registering face:', error);
-    throw error;
+    console.error('Error registering student:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'An unknown error occurred',
+    };
   }
-};
+}
+
+/**
+ * Take attendance for a session
+ * @param sessionData - Session information
+ * @param imageBase64 - Base64 encoded image with student faces
+ * @returns Promise with attendance result
+ */
+export async function takeAttendance(sessionData: any, imageBase64: string): Promise<ApiResponse> {
+  try {
+    const response = await fetch(`${API_URL}/take-attendance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionData,
+        image: imageBase64,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success,
+      data: data.attendance,
+      message: data.message,
+    };
+  } catch (error) {
+    console.error('Error taking attendance:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'An unknown error occurred',
+    };
+  }
+}
 
 /**
  * Recognize faces in the provided image
@@ -187,49 +274,6 @@ export async function registerStudentWithFace(studentData: any, faceImage: FaceD
     return data;
   } catch (error) {
     console.error('Error in API student registration:', error);
-    throw error;
-  }
-}
-
-/**
- * Take attendance using the Python API
- */
-export async function takeAttendance(sessionData: any, image: FaceDetectionInput) {
-  try {
-    console.log('Taking attendance via Python API...');
-    
-    // Convert image to base64
-    const base64Image = await convertToBase64(image);
-    
-    // Send to API
-    const response = await fetch(`${API_URL}/api/take-attendance`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sessionData,
-        image: base64Image,
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to take attendance');
-    }
-    
-    const data = await response.json();
-    console.log('Attendance response:', data);
-    
-    if (!data.success) {
-      throw new Error(data.message || 'Attendance taking failed');
-    }
-    
-    return {
-      recognizedStudents: data.recognizedStudents || []
-    };
-  } catch (error) {
-    console.error('Error in API attendance:', error);
     throw error;
   }
 } 
