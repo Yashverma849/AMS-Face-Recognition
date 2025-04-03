@@ -25,7 +25,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://amsfacerecognition.vercel.app",
-        "https://amsfacerecognition-p39wazpsi-yash-vermas-projects-400e0953.vercel.app"
+        "https://amsfacerecognition-p39wazpsi-yash-vermas-projects-400e0953.vercel.app",
+        "https://bpit-attendance-system.vercel.app",
+        "*"  # Allow all origins during testing
     ],  # Add your Vercel domains
     allow_credentials=True,
     allow_methods=["*"],
