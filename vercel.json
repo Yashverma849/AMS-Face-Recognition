@@ -1,12 +1,22 @@
 {
+  "rewrites": [
+    { "source": "/test.html", "destination": "/test.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "buildCommand": "next build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
+  "functions": {
+    "api/*": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "env": {
+    "NEXT_PUBLIC_FACE_API_URL": "https://bpit-face-api.onrender.com"
+  },
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
   "headers": [
     {
       "source": "/(.*)",
@@ -16,7 +26,5 @@
         { "key": "X-XSS-Protection", "value": "1; mode=block" }
       ]
     }
-  ],
-  "ignoreCommand": "echo 'Skipping ignored directories'",
-  "excludeFiles": ["api/**", "start_app.bat"]
+  ]
 } 

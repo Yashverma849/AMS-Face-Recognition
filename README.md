@@ -1,64 +1,41 @@
 # BPIT Attendance System
 
-A face recognition-based attendance system for BPIT. This application allows instructors to register students and take attendance using facial recognition technology.
+A face recognition-based attendance system for Bhagwan Parshuram Institute of Technology.
 
 ## Features
 
-- Web-based interface for easy access
-- Face recognition for student identification
-- Registration of new students with facial data
-- Taking attendance by recognizing faces
-- Viewing attendance records
-
-## System Architecture
-
-The system consists of two main components:
-
-1. **Frontend**: Next.js web application for user interface
-2. **Backend**: Python-based face recognition API running on Render.com
-
-## Development
-
-### Prerequisites
-
-- Node.js (v16+)
-- npm or yarn
-- Python 3.8+ (for backend API)
-
-### Setup
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Create a `.env.local` file with the required environment variables
-4. Start the development server: `npm run dev`
-
-### Environment Variables
-
-- `NEXT_PUBLIC_SUPABASE_URL`: URL for Supabase instance
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Anon key for Supabase
-- `NEXT_PUBLIC_FACE_API_URL`: URL for the face recognition API
-
-## Deployment
-
-The frontend is deployed on Vercel and the face recognition API is deployed on Render.com.
-
-Last updated: April 3, 2025
+- User authentication with Supabase
+- Student registration with face encoding
+- Automated attendance using face recognition
+- Dashboard for attendance statistics
+- Secure data storage in Supabase
+- Hybrid face recognition (browser-based or API-based)
 
 ## Tech Stack
 
 - **Frontend**: Next.js, TypeScript, Tailwind CSS
-- **Backend**: Python, Flask
+- **Face Recognition (Browser)**: TensorFlow.js, BlazeFace
+- **Face Recognition (API)**: Python, OpenCV, face_recognition
 - **Database**: Supabase (PostgreSQL)
 - **Storage**: Supabase Storage
 - **Authentication**: Supabase Auth
-- **Face Recognition**: OpenCV (Python)
+- **API Backend**: FastAPI
+
+## Deployment Architecture
+
+The system uses a hybrid approach for face recognition:
+
+1. **Browser-based detection**: Using TensorFlow.js models that run directly in the browser
+2. **API-based detection**: Using a Python FastAPI backend with OpenCV for more accurate detection
+
+This dual approach ensures the system works even when the Python API is not available, providing redundancy and flexibility.
 
 ## Setup Instructions
 
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Python 3.10+ (recommended for best compatibility)
+- Python 3.10+ (for API server)
 - Supabase account
 
 ### Supabase Setup
@@ -71,17 +48,13 @@ Last updated: April 3, 2025
 
 ### Environment Setup
 
-1. **Frontend**: Copy `.env.example` to `.env.local` and fill in your Supabase details:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
+1. Copy `.env.example` to `.env.local` and fill in your details:
 
-2. **Backend**: Copy `python-server/.env.example` to `python-server/.env` and fill in:
-   ```
-   SUPABASE_URL=https://your-project-id.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   ```
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_FACE_API_URL=http://localhost:8000
+```
 
 ### Installation
 
@@ -91,9 +64,9 @@ Last updated: April 3, 2025
    npm run dev
    ```
 
-2. **Backend**:
+2. **API Backend**:
    ```bash
-   cd python-server
+   cd api
    
    # Option 1: Using pip directly
    pip install -r requirements.txt
@@ -104,7 +77,17 @@ Last updated: April 3, 2025
    pip install -r requirements.txt
    
    # Start the server
-   python app.py
+   python -m uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+
+3. **Quick Start Script**:
+   Use the provided script to start both frontend and backend:
+   ```bash
+   # On Windows
+   start_app.bat
+   
+   # On macOS/Linux
+   ./start_app.sh
    ```
 
 ## Deployment
@@ -113,15 +96,35 @@ Last updated: April 3, 2025
 
 1. Push your code to GitHub
 2. Connect your repository to Vercel
-3. Add your environment variables in Vercel
-4. Deploy
+3. Add these environment variables in Vercel:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_FACE_API_URL` (pointer to your Python API)
 
-### Backend (Render, Heroku, etc.)
+### API Backend (Render)
 
-1. Choose a Python hosting service
-2. Set up environment variables
-3. Deploy the `python-server` directory
-4. Update your frontend's `NEXT_PUBLIC_PYTHON_API_URL` to point to your deployed API
+1. Sign up for a Render.com account
+2. Create a new Web Service
+3. Connect your GitHub repository
+4. Configure as:
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - Environment Variables:
+     - Set `PYTHON_VERSION` to `3.10.0`
+5. Deploy the `api` directory
+
+## Testing
+
+You can test the face recognition API independently using the provided test page:
+
+```
+https://your-deployed-site.vercel.app/test.html
+```
+
+This test page allows you to:
+1. Check connection to the API
+2. Capture images from your camera
+3. Test face detection directly with the API
 
 ## Security Notes
 
@@ -135,7 +138,7 @@ Last updated: April 3, 2025
 
 ## Contributors
 
-- [Your Name](https://github.com/yourusername)
+- [Yash Verma](https://github.com/Yashverma849)
 
 ## Deployment Instructions
 
@@ -151,7 +154,7 @@ The frontend is configured to deploy automatically to Vercel and excludes the Py
 
 The Python API requires:
 - Python 3.8+ with build tools
-- CMake and dlib dependencies
+- OpenCV and face_recognition libraries
 
 **Option 1: Run API on a server (recommended)**
 1. Set up a server with Python and required dependencies
@@ -162,7 +165,6 @@ The Python API requires:
 
 **Option 2: Use a serverless Python provider**
 - Deploy to a service like AWS Lambda, Google Cloud Functions, or Render that supports Python APIs
-- Make sure to include build steps for installing dlib
 
 ## Local Development
 
@@ -187,6 +189,5 @@ start_app.bat
 
 ## Important Notes
 
-- The Face Recognition API requires dlib which needs C++ build tools and CMake
 - Vercel cannot build Python packages with binary dependencies
 - For production, deploy the API on a separate service and update the API URL 

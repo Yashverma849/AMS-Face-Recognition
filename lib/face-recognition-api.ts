@@ -1,279 +1,193 @@
-"use client"
-
-import { FaceDetectionInput } from './face-recognition';
-import { ApiResponse } from '@/types/api';
-
-// API client for the Python face recognition backend
-
-export const API_URL = process.env.NEXT_PUBLIC_FACE_API_URL || 'http://localhost:8000';
+import { supabase } from './supabase';
 
 /**
- * Convert a base64 image to a blob for API upload
+ * API URL for the face recognition backend
  */
-export const base64ToBlob = (base64: string, type = 'image/jpeg'): Blob => {
-  const byteString = atob(base64.split(',')[1]);
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
+const FACE_API_URL = process.env.NEXT_PUBLIC_FACE_API_URL || 'https://bpit-face-api.onrender.com';
+
+/**
+ * Convert a canvas or image element to a base64 string
+ */
+export function convertToBase64(element: HTMLCanvasElement | HTMLImageElement): string {
+  // If it's already a canvas, get its data URL
+  if (element instanceof HTMLCanvasElement) {
+    return element.toDataURL('image/jpeg', 0.9);
   }
   
-  return new Blob([ab], { type });
-};
+  // If it's an image, draw it to a canvas first
+  const canvas = document.createElement('canvas');
+  canvas.width = element.width;
+  canvas.height = element.height;
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) {
+    throw new Error('Failed to create canvas context');
+  }
+  
+  ctx.drawImage(element, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
 
 /**
- * Test connection to the Face Recognition API
- * @returns Promise with connection status
+ * Test connection to the face recognition API
  */
-export async function testApiConnection(): Promise<ApiResponse> {
+export async function testApiConnection(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_URL}/test-connection`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
+    const response = await fetch(`${FACE_API_URL}/test-connection`);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error: ${response.status}`);
     }
-
     const data = await response.json();
-    return {
-      success: true,
-      data,
-      message: data.message || 'Connection successful',
-    };
+    console.log('API connection test successful:', data);
+    return true;
   } catch (error) {
-    console.error('Error testing API connection:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Failed to connect to Face Recognition API',
-    };
+    console.error('API connection test failed:', error);
+    return false;
   }
 }
 
 /**
- * Detect faces in an image
- * @param imageBase64 - Base64 encoded image
- * @returns Promise with detected faces information
+ * Detect faces in an image using the Python API
+ * This function mimics the interface of the TensorFlow.js detectFaces function
+ * but uses the Python backend instead
  */
-export async function detectFaces(imageBase64: string): Promise<ApiResponse> {
+export async function detectFacesWithApi(input: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement) {
   try {
-    const response = await fetch(`${API_URL}/detect-faces`, {
+    // For video elements, capture a frame first
+    let imageData: string;
+    
+    if (input instanceof HTMLVideoElement) {
+      const canvas = document.createElement('canvas');
+      canvas.width = input.videoWidth;
+      canvas.height = input.videoHeight;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Failed to create canvas context');
+      }
+      
+      ctx.drawImage(input, 0, 0);
+      imageData = canvas.toDataURL('image/jpeg', 0.9);
+    } else {
+      imageData = convertToBase64(input);
+    }
+    
+    // Call the API
+    const response = await fetch(`${FACE_API_URL}/detect-faces`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ image: imageBase64 }),
+      body: JSON.stringify({ image: imageData })
     });
-
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`API error (${response.status}): ${errorText}`);
     }
-
+    
     const data = await response.json();
-    return {
-      success: data.success,
-      data: data.faces,
-      message: data.message,
-    };
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Face detection failed');
+    }
+    
+    // Transform the API response to match the TensorFlow.js format
+    return data.faces.map((face: any) => ({
+      topLeft: [face.box.left, face.box.top],
+      bottomRight: [face.box.right, face.box.bottom],
+      landmarks: [], // API may not provide landmarks
+      probability: [0.99], // Placeholder - API may provide confidence
+      // Keep the original data too
+      apiData: face
+    }));
+    
   } catch (error) {
-    console.error('Error detecting faces:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'An unknown error occurred',
-    };
+    console.error('Error detecting faces with API:', error);
+    throw error;
   }
 }
 
 /**
- * Register a student with face data
- * @param studentData - Student information
- * @param imageBase64 - Base64 encoded image of student's face
- * @returns Promise with registration result
+ * Register a student face
  */
-export async function registerStudent(studentData: any, imageBase64: string): Promise<ApiResponse> {
+export async function registerStudentFace(studentData: any, faceImage: HTMLCanvasElement) {
   try {
-    const response = await fetch(`${API_URL}/register-face`, {
+    const imageData = convertToBase64(faceImage);
+    
+    // Call the API
+    const response = await fetch(`${FACE_API_URL}/register-face`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         studentData,
-        image: imageBase64,
-      }),
+        image: imageData
+      })
     });
-
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`API error (${response.status}): ${errorText}`);
     }
-
+    
     const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Face registration failed');
+    }
+    
     return {
-      success: data.success,
-      data,
-      message: data.message,
+      success: true,
+      message: data.message || 'Student registered successfully'
     };
+    
   } catch (error) {
-    console.error('Error registering student:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'An unknown error occurred',
-    };
+    console.error('Error registering student face:', error);
+    throw error;
   }
 }
 
 /**
- * Take attendance for a session
- * @param sessionData - Session information
- * @param imageBase64 - Base64 encoded image with student faces
- * @returns Promise with attendance result
+ * Take attendance using face recognition
  */
-export async function takeAttendance(sessionData: any, imageBase64: string): Promise<ApiResponse> {
+export async function takeAttendanceWithApi(sessionData: any, faceImage: HTMLCanvasElement) {
   try {
-    const response = await fetch(`${API_URL}/take-attendance`, {
+    const imageData = convertToBase64(faceImage);
+    
+    // Call the API
+    const response = await fetch(`${FACE_API_URL}/recognize-faces`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         sessionData,
-        image: imageBase64,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {
-      success: data.success,
-      data: data.attendance,
-      message: data.message,
-    };
-  } catch (error) {
-    console.error('Error taking attendance:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'An unknown error occurred',
-    };
-  }
-}
-
-/**
- * Recognize faces in the provided image
- */
-export const recognizeFaces = async (imageData: string): Promise<any> => {
-  try {
-    console.log("🔍 Recognizing faces with API at:", API_URL);
-    
-    const formData = new FormData();
-    const blob = base64ToBlob(imageData);
-    formData.append('image', blob, 'image.jpg');
-    
-    const response = await fetch(`${API_URL}/recognize-faces`, {
-      method: 'POST',
-      body: formData,
+        image: imageData
+      })
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error recognizing faces:', error);
-    throw error;
-  }
-};
-
-/**
- * Convert image to base64
- */
-export async function convertToBase64(input: FaceDetectionInput): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      // If input is already a canvas
-      if (input instanceof HTMLCanvasElement) {
-        const dataUrl = input.toDataURL('image/jpeg', 0.9);
-        resolve(dataUrl);
-        return;
-      }
-      
-      // If input is an image or video, draw to temp canvas
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      
-      if (!context) {
-        reject(new Error('Could not get canvas context'));
-        return;
-      }
-      
-      // Set canvas dimensions
-      if (input instanceof HTMLVideoElement) {
-        canvas.width = input.videoWidth;
-        canvas.height = input.videoHeight;
-        context.drawImage(input, 0, 0, canvas.width, canvas.height);
-      } else if (input instanceof HTMLImageElement) {
-        canvas.width = input.width;
-        canvas.height = input.height;
-        context.drawImage(input, 0, 0, canvas.width, canvas.height);
-      } else {
-        reject(new Error('Unsupported input type'));
-        return;
-      }
-      
-      // Convert to data URL
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      resolve(dataUrl);
-    } catch (error) {
-      console.error('Error converting to base64:', error);
-      reject(error);
-    }
-  });
-}
-
-/**
- * Register a student with their face using the Python API
- */
-export async function registerStudentWithFace(studentData: any, faceImage: FaceDetectionInput) {
-  try {
-    console.log('Registering student via Python API...');
-    
-    // Convert face image to base64
-    const base64Image = await convertToBase64(faceImage);
-    
-    // Send to API
-    const response = await fetch(`${API_URL}/api/register-student`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        studentData,
-        image: base64Image,
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to register student');
+      const errorText = await response.text();
+      throw new Error(`API error (${response.status}): ${errorText}`);
     }
     
     const data = await response.json();
-    console.log('Student registration response:', data);
     
     if (!data.success) {
-      throw new Error(data.message || 'Student registration failed');
+      throw new Error(data.message || 'Face recognition failed');
     }
     
-    return data;
+    return {
+      success: true,
+      message: data.message || 'Attendance recorded successfully',
+      recognized: data.recognized || [],
+      session_id: data.session_id
+    };
+    
   } catch (error) {
-    console.error('Error in API student registration:', error);
+    console.error('Error taking attendance:', error);
     throw error;
   }
 } 
