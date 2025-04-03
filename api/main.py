@@ -7,7 +7,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 
 import cv2
-import face_recognition
+# import face_recognition
+import face_recognition as custom_fr  # Use our custom module
 import numpy as np
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,7 +29,7 @@ app.add_middleware(
 )
 
 # Data directories
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+DATA_DIR = os.path.join("/app", "data")
 FACES_DIR = os.path.join(DATA_DIR, "faces")
 ATTENDANCE_DIR = os.path.join(DATA_DIR, "attendance")
 
@@ -147,7 +148,7 @@ async def health():
         "status": "ok",
         "version": "1.0.0",
         "timestamp": datetime.now().isoformat(),
-        "face_recognition_loaded": face_recognition is not None,
+        "face_recognition_loaded": custom_fr is not None,
         "known_faces_count": len(known_face_encodings)
     }
 
@@ -169,8 +170,8 @@ async def detect_faces(request: FaceDetectionRequest):
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
         # Detect faces (locations and encodings)
-        face_locations = face_recognition.face_locations(rgb_image)
-        face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
+        face_locations = custom_fr.face_locations(rgb_image)
+        face_encodings = custom_fr.face_encodings(rgb_image, face_locations)
         
         # Format response
         faces = []
@@ -235,7 +236,7 @@ async def register_student(request: RegisterStudentRequest = None, background_ta
         
         # Detect face in the image
         rgb_image = cv2.cvtColor(image_data, cv2.COLOR_BGR2RGB)
-        face_locations = face_recognition.face_locations(rgb_image)
+        face_locations = custom_fr.face_locations(rgb_image)
         
         if not face_locations:
             return JSONResponse(
@@ -250,7 +251,7 @@ async def register_student(request: RegisterStudentRequest = None, background_ta
             )
         
         # Get face encoding
-        face_encoding = face_recognition.face_encodings(rgb_image, face_locations)[0]
+        face_encoding = custom_fr.face_encodings(rgb_image, face_locations)[0]
         
         # Create directory for student data
         student_dir = os.path.join(FACES_DIR, student_id)
@@ -325,7 +326,7 @@ async def take_attendance(request: AttendanceSessionRequest = None,
             
         # Detect faces
         rgb_image = cv2.cvtColor(image_data, cv2.COLOR_BGR2RGB)
-        face_locations = face_recognition.face_locations(rgb_image)
+        face_locations = custom_fr.face_locations(rgb_image)
         
         if not face_locations:
             return {
@@ -335,15 +336,15 @@ async def take_attendance(request: AttendanceSessionRequest = None,
             }
         
         # Get face encodings
-        face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
+        face_encodings = custom_fr.face_encodings(rgb_image, face_locations)
         
         # Compare with known faces
         recognized_students = []
         
         for i, (face_location, face_encoding) in enumerate(zip(face_locations, face_encodings)):
             # Compare face with all known faces
-            matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.6)
-            face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+            matches = custom_fr.compare_faces(known_face_encodings, face_encoding, tolerance=0.6)
+            face_distances = custom_fr.face_distance(known_face_encodings, face_encoding)
             
             best_match_index = np.argmin(face_distances)
             
